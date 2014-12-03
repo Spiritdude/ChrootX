@@ -8,7 +8,7 @@ my $VERSION = '0.0.3';
 # License: GPLv3
 #
 # History:
-# 2014/12/04: 0.0.3: /var/lib/chrootx/fstab as default mount for all chroot
+# 2014/12/04: 0.0.3: /var/lib/chrootx/fstab as default mount for all chroot, proper stop of chroot
 # 2014/12/02: 0.0.2: jchroot included, which allows to set hostname and sub-process isolation
 # 2014/11/30: 0.0.1: first version
 
@@ -17,10 +17,14 @@ use JSON;
 use strict;
 
 my $conf;
-my $conf->{root} = '/var/lib/chrootx';
+
+# -- defaults
+$conf->{root} = '/var/lib/chrootx';
+$conf->{chroot} = '/usr/sbin/chroot';
+$conf->{jchroot} = '/usr/sbin/jchroot';
 
 my(@mnts);
-my %_mounted;
+my(%_mounted,%_pid);
 
 if($> != 0) {
    print STDERR "ERROR: $APPNAME must be run as root!\n";
@@ -122,8 +126,8 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
 
    existRoot($id,{must=>1});
 
-   if(-e "/usr/sbin/jchroot") {
-      exec("/usr/sbin/jchroot","-f","$conf->{root}/fstab","-n",$id,"$conf->{root}/roots/$id",@ARGV);
+   if(-e $conf->{jchroot}) {
+      exec($conf->{jchroot},"-f","$conf->{root}/fstab","-n",$id,"$conf->{root}/roots/$id",@ARGV);
    } else {
       mountRoot($id);
       exec("/usr/sbin/chroot","$conf->{root}/roots/$id",@ARGV);
@@ -134,7 +138,17 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    my $id = shift(@ARGV);
    $id = sane($id,'id');
    existRoot($id,{must=>1});
-   umountRoot($id);
+   if(statusRoot($id)eq'running') {
+      my $pid = $_pid{$id};
+      if(-e $conf->{jchroot}) {
+         kill 'KILL', $pid;
+      } else {
+         kill 'KILL', $pid;
+         umountRoot($id);
+      }
+   } else {
+      print "<$id> is not running\n";
+   }
    
 } elsif($cmd eq 'mv'||$cmd eq 'rename') {
    help() unless($#ARGV>=1);
@@ -215,6 +229,21 @@ sub existRoot {
 
 sub statusRoot {
    my($id) = @_;
+   if(!%_pid) {
+      foreach(split(/\n/,`ps auxw`)) {
+         my(@d) = split(/\s+/);
+         if(index($_,$conf->{jchroot})>=0&&/ -n (\S+)/) {
+            $_pid{$1} = $d[1];
+         } elsif(index($_,$conf->{chroot})>=0&&index($_,$conf->{root})>=0) {
+            my $n = index($_,$conf->{root});
+            my $s = substr($_,$n);
+            $_pid{$1} = $d[1] if($s =~ /^(\S+)/);
+         } elsif(/\/chrootx start (\S+)$/) {
+            $_pid{$1} = $d[1];
+         }
+      }
+   }
+   return $_pid{$id}?"running":"stopped";
    return isMounted("$conf->{root}/roots/$id/dev/pts")?"running":"stopped";
 }
 
