@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# == Debian Sid
+# written by Rene K. Mueller <spiritdude@gmail.com>
+#    installs debian 'sid'
+
+ID=`basename $1`
+debootstrap sid $1
+
+# -- set hostname
+mkdir -p $1/etc; echo "${ID}" > $1/etc/hostname
+#chroot $1 /bin/sh -c "/bin/hostname ${ID}"
+
+echo "rootfs / rootfs rw 0 0" > $1/etc/mtab
+

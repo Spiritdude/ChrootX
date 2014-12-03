@@ -1,0 +1,5 @@
+
+Issues:
+- In chroot root can kill processes outside of the host
+- In chroot cannot /bin/hostname myname - changes hostname of host
+

@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# == Ubuntu Trusty
+# written by Rene K. Mueller <spiritdude@gmail.com>
+#    installs ubuntu 'trusty'
+
+ID=`basename $1`
+debootstrap trusty $1 http://archive.ubuntu.com/ubuntu 
+
+# -- set hostname
+mkdir -p $1/etc; echo "${ID}" > $1/etc/hostname
+#chroot $1 /bin/sh -c "/bin/hostname ${ID}"
+
+echo "rootfs / rootfs rw 0 0" > $1/etc/mtab
+

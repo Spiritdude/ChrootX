@@ -1,0 +1,6 @@
+proc     /proc  proc    defaults                  0  0
+sysfs    /sysfs   sysfs   defaults                  0  0
+#/home    /home  none    bind,rw                   0  0
+/dev/pts /dev/pts none  bind,rw                   0  0
+#/var/run /var/run tmpfs rw,nosuid,noexec,mode=755 0  0
+#/etc/resolv.conf /etc/resolv.conf none bind,ro    0  0

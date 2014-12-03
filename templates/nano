@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# == Nano
+# written by Rene K. Mueller <spiritdude@gmail.com>
+#   using busybox is the most small chroot
+
+mkdir -p $1/bin
+cp -f /bin/busybox $1/bin/
+cd $1/bin/; ln -f busybox sh
+

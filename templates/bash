@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# == Bash
+# written by Rene K. Mueller <spiritdude@gmail.com>
+#    installs static bash & busybox, and calls busybox --install
+
+ID=`basename $1`
+mkdir -p $1/bin
+cp -f /bin/bash-static $1/bin/bash
+cp -f /bin/busybox $1/bin/
+cd $1/bin; ln -f bash sh
+chroot $1 /bin/bash -c "/bin/busybox --install &> log; rm -f log"
+
+# -- set hostname
+mkdir -p $1/etc; echo "${ID}" > $1/etc/hostname
+#chroot $1 /bin/sh -c "/bin/hostname ${ID}"
+
+echo "rootfs / rootfs rw 0 0" > $1/etc/mtab
+

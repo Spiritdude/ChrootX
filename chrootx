@@ -1,0 +1,475 @@
+#!/usr/bin/perl
+
+# -- CHROOTX, toolset for handling chrooted systems, written by Rene K. Mueller <spiritdude@gmail.com>
+#
+my $APPNAME = 'chrootx';
+my $VERSION = '0.0.3';
+#
+# License: GPLv3
+#
+# History:
+# 2014/12/04: 0.0.3: /var/lib/chrootx/fstab as default mount for all chroot
+# 2014/12/02: 0.0.2: jchroot included, which allows to set hostname and sub-process isolation
+# 2014/11/30: 0.0.1: first version
+
+use POSIX;
+use JSON;
+use strict;
+
+my $conf;
+my $conf->{root} = '/var/lib/chrootx';
+
+my(@mnts);
+my %_mounted;
+
+if($> != 0) {
+   print STDERR "ERROR: $APPNAME must be run as root!\n";
+   exit -1;
+}
+
+mkdir $conf->{root} unless(-e $conf->{root});
+mkdir "$conf->{root}/roots" unless(-e "$conf->{root}/roots");
+
+# -- fetch default mounts in chroot
+open(F,"$conf->{root}/fstab");
+while(<F>) {
+   chop;
+   next if(/^\s*#/);
+   push(@mnts,$_);
+}
+close(F);
+
+while($ARGV[0]=~/^-/) {
+   $_ = shift(@ARGV);
+   if(/^-conf/) {
+      my $c = conf(shift(@ARGV));
+      foreach (keys %$c) {
+         $conf->{$_} = $c->{$_};
+      }
+   }
+   help() if(/^-help$/||/^-h/);
+   if(/^-(\w+)/||/^--(\w+)/) {
+      my $v = $1;
+      if($v eq 'version') {
+         print "$APPNAME $VERSION\n"; 
+         exit 0; 
+      }
+      foreach (split(/|/,$v)) {
+         $_ = 'verbose' if($_ eq 'v');
+         $conf->{$_}++;
+      }
+      next;
+   }
+   deepVar($conf,$1,$2), next if(/^--?([\.\w]+)=(.*)/);
+}
+
+my $cmd = shift(@ARGV);
+
+sub help {
+
+   opendir(D,"$conf->{root}/templates");
+   my(@t) = sort grep(!/\./,readdir(D));
+   closedir(D);
+
+   my $types = join(', ',map { $_ = "'$_'" } @t);
+   
+   print "$APPNAME $VERSION usage: [<options>] <command> [<arguments>]
+   options:
+      -verbose or -v or -vv   increase verbosity
+      -conf <file>            consider configuration file
+      -version or --version   display version
+      -l                      long output
+      
+   commands:
+      create <id> [<type>]    type: $types
+      delete <id>
+      start <id>
+      stop <id>
+      info <id>
+      list
+
+";   
+   exit 0;
+}
+
+print "$APPNAME: performed <$cmd>\n" if($conf->{verbose});
+
+if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
+   help() unless($#ARGV>=0);
+   my $id = shift(@ARGV);
+   $id = sane($id,'id');
+   my $type = 'minimal';
+   $type = shift(@ARGV) if($#ARGV>=0);
+   if(!existRoot($id)) {
+      createRoot($id,$type);
+   } else {
+      print "<$id> exist already\n";
+   }
+
+} elsif($cmd eq 'delete'||$cmd eq 'remove'||$cmd eq 'deinstall') {
+   help() unless($#ARGV>=0);
+   my $id = shift(@ARGV);
+   $id = sane($id,'id');
+   if(existRoot($id,{must=>1})) {
+      `rm -rf $conf->{root}/roots/$id`;
+   }
+   
+} elsif($cmd eq 'start'||$cmd eq 'run') {
+   help() unless($#ARGV>=0);
+   my $id = shift(@ARGV);
+   $id = sane($id,'id');
+   push(@ARGV,"/bin/sh") if($#ARGV<0);
+
+   existRoot($id,{must=>1});
+
+   if(-e "/usr/sbin/jchroot") {
+      exec("/usr/sbin/jchroot","-f","$conf->{root}/fstab","-n",$id,"$conf->{root}/roots/$id",@ARGV);
+   } else {
+      mountRoot($id);
+      exec("/usr/sbin/chroot","$conf->{root}/roots/$id",@ARGV);
+   }
+   
+} elsif($cmd eq 'stop'||$cmd eq 'kill'||$cmd eq 'abort'||$cmd eq 'halt') {
+   help() unless($#ARGV>=0);
+   my $id = shift(@ARGV);
+   $id = sane($id,'id');
+   existRoot($id,{must=>1});
+   umountRoot($id);
+   
+} elsif($cmd eq 'mv'||$cmd eq 'rename') {
+   help() unless($#ARGV>=1);
+   my $id1 = shift(@ARGV);
+   my $id2 = shift(@ARGV);
+   existRoot($id1,{must=>1});
+   if(statusRoot($id1)eq'stopped') {
+      existRoot($id2,{mustNot=>1});
+      rename("$conf->{root}/roots/$id1","$conf->{root}/roots/$id2");
+   } else {
+      print "<$id1> is still running, please stop before rename\n";
+   }
+   
+} elsif($cmd eq 'info') {
+   help() unless($#ARGV>=0);
+   my $id = shift(@ARGV);
+   $id = sane($id,'id');
+   $conf->{l}++;
+   existRoot($id,{must=>1});
+   dispRoot($id);
+
+} elsif($cmd eq 'help') {
+   help();
+
+} elsif($cmd eq 'list'||!$cmd) {
+
+   opendir(D,"$conf->{root}/roots");
+   my(@c) = grep(!/\./,readdir(D));
+   closedir(D);
+   foreach my $c (sort @c) {
+      dispRoot($c);
+   }
+   print "\tno chroot yet defined\n" if($#c<0);
+
+} else {
+   help();
+}
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+sub createRoot {
+   my($id,$type) = @_;
+   my $i;
+
+   unless(-e "$conf->{root}/roots/$id") {
+      mkdir "$conf->{root}/roots/$id";
+      $i->{ctime} = time();
+      $i->{type} = $type if($type);
+
+      writeJSON("$conf->{root}/roots/$id/.info.json",$i);
+
+      if(-e "$conf->{root}/templates/$type") {
+         `$conf->{root}/templates/$type $conf->{root}/roots/$id`;
+      } else {
+         print "\tERROR: <$type> template not found\n";
+         exit 1;
+      }
+      $i->{size} = sizeRoot($id);
+      writeJSON("$conf->{root}/roots/$id/.info.json",$i);
+
+   } else {
+      print "\t<$id> already exists, skipped\n";
+   }
+}
+
+sub existRoot {
+   my($id,$opts) = @_;
+   if($opts->{mustNot}&&-e "$conf->{root}/roots/$id") {
+      print "ERROR: <$id> does exist (already)\n";
+      exit -1;
+   }
+   return 1 if(-e "$conf->{root}/roots/$id");
+   if($opts->{must}) {
+      print "ERROR: <$id> doesn't exist\n";
+      exit -1;
+   }
+}
+
+sub statusRoot {
+   my($id) = @_;
+   return isMounted("$conf->{root}/roots/$id/dev/pts")?"running":"stopped";
+}
+
+sub isMounted {
+   my($m) = @_;
+
+   if(!%_mounted) {
+      foreach (split(/\n/,`mount`)) {
+         my(@d) = split(/\s+/);
+         $_mounted{$d[2]}++;
+      }
+   }
+   print "$m is ",($_mounted{$m}?"mounted":"not mounted"),"\n" if($conf->{verbose});
+   return $_mounted{$m};
+}
+
+sub mountRoot {
+   my($id) = @_;
+
+   if(!isMounted("$conf->{root}/roots/$id/dev/pts")) {
+      print "mount special dirs\n" if($conf->{verbose});
+      foreach (@mnts) {
+         my(@d) = split(/\s+/);
+         #   proc     /proc  proc    defaults                  0  0
+         #   sysfs    /sysfs   sysfs   defaults                  0  0
+         #   #/home    /home  none    bind,rw                   0  0
+         #   /dev/pts /dev/pts none  bind,rw                   0  0
+         #   #/var/run /var/run tmpfs rw,nosuid,noexec,mode=755 0  0
+         #   #/etc/resolv.conf /etc/resolv.conf none bind,ro    0  0
+         mkrdir("$conf->{root}/roots/$id$d[1]") unless(-e "$conf->{root}/roots/$id$d[1]");
+         print "mounting $d[0] -> $conf->{root}/roots/$id$d[1]\n" if($conf->{verbose});
+         `mount -o $d[3] -t $d[2] $d[0] $conf->{root}/roots/$id$d[1]`; # unless(-e "$conf->{root}/roots/$id$d[1]");
+      }
+   }
+}
+
+sub umountRoot {
+   my($id) = @_;
+   
+   if(isMounted("$conf->{root}/roots/$id/dev/pts")) {
+      foreach (@mnts) {
+         my(@d) = split(/\s+/);
+         `umount -f $conf->{root}/roots/$id$d[1]`;
+      }
+   }
+}
+
+sub dispRoot {
+   my($id) = @_;
+   my($i) = readJSON("$conf->{root}/roots/$id/.info.json");
+   my $p = "$conf->{root}/roots/$id";
+
+   if($conf->{l}) {
+      unless($i->{size}) {
+         $i->{size} = sizeRoot($id);
+      }
+      unless($i->{ctime}) {
+         $i->{ctime} = (stat("$conf->{root}/roots/$id"))[10];
+      }
+   }
+   unless($i->{type}) {
+      $i->{type} = 'custom';
+   }
+
+   $i->{status} = statusRoot($id);
+
+   if($conf->{l}) {
+      print "   $id:\n";
+      foreach (qw(status type ctime size)) {
+         my $v = $i->{$_};
+         $v = prettyDate($v)." (".prettyAgo($i->{$_}).")" if(/time/);
+         $v = prettyNumber($v) if($v=~/^[1-9]\d*$/);
+         print "\t$_: $v\n";
+      }
+      print toJSON($i),"\n" if($conf->{verbose});
+      print "\n";
+      
+   } else {
+      print sprintf("%20s: $i->{status}\n","$id ($i->{type})");
+   }
+   if(1) {
+      foreach (qw(status)) {
+         delete $i->{$_};
+      }
+      writeJSON("$conf->{root}/roots/$id/.info.json",$i);
+   }
+}
+
+sub sizeRoot {
+   my($id) = @_;
+   return $1*1024 if(`du -sk '$conf->{root}/roots/$id'`=~/(\d+)/);
+   return 0;
+}
+
+sub conf {
+   my($f) = @_;
+   return readJSON($f);
+}
+
+sub sane {
+   my($i,$t) = @_;
+   if($t eq 'id') {
+      $i =~ s/[^a-zA-Z0-9_]//g;
+      if(length($i)==0) {
+         print "ERROR: <$i> not a valid identifier\n";
+         exit 1;
+      }
+
+   } else {
+      $i =~ s/\s//g;
+   }
+   return $i;
+}
+
+# -----------------------------------------------------------------------------------------------------------------
+
+sub fromJSON {
+   # -- eval so failed decode doesn't die process
+   return eval { JSON->new->allow_nonref->relaxed([1])->decode($_[0]) };
+}
+
+sub toJSON {
+   my($v,$a) = @_;
+   my $j = JSON->new->allow_nonref->allow_blessed;
+   $j = $j->pretty unless($a&&!$a->{pretty});
+   return $j->encode($_[0]);
+}
+
+sub writeJSON {
+   my($n,$v,$a) = @_;
+   my $fh;
+   open($fh,'>',"$n.new");
+   print $fh toJSON($v,$a);
+   close($fh);
+   rename("$n.new",$n);
+}
+
+sub readJSON {
+   my($n) = @_;
+   local $/;
+   my $fh;
+   my $v;
+   open($fh,'<',$n);
+   $v = <$fh>;
+   close($fh);
+   return fromJSON($v);
+}
+
+sub deepVar {
+   my($r,$k,$v) = @_;
+   my $p = $r;
+   
+   my(@pp) = split(/\./,$k);
+   $k = pop(@pp);
+   foreach (@pp) {
+      $p->{$_} = {} unless(defined $p->{$_});
+      $p = $p->{$_};
+   }
+   if($#_>=2) {      # -- writing
+      $p->{$k} = $v;
+   } else {          # -- reading
+      return $p->{$k};
+   }
+}
+
+sub mkrdir {
+   my($p) = @_;
+   my $r;
+   foreach (split(/\//,$p)) {
+      next if(length($_)==0);
+      $r .= "/$_";
+      mkdir $r unless(-e $r);
+   }
+}
+
+sub prettyDate {
+   my($t) = @_;
+   @_ = localtime($t);
+   #sprintf("%s/%02d/%02d %02d:%02d:%02d.%03d",$_[5]<0?sprintf("%04d",$_[5]*-1+1)."BCE":sprintf("%04d",$_[5]),$_[4]+1,$_[3],$_[2],$_[1],$_[0],($t-int($t))*1000);
+   sprintf("%04d/%02d/%02d %02d:%02d:%02d.%03d",$_[5]+1900,$_[4]+1,$_[3],$_[2],$_[1],$_[0],($t-int($t))*1000);
+}
+
+sub prettyAgo {
+   my $t = time()-$_[0];
+   my $opts = $_[1];
+   my $ago = $t>=0;
+   my $to = '';
+   
+   $t = $ago?$t:-$t;
+
+   my $p = 0; my $m = 1;
+   my @out;
+   my(@tx) = localtime($t);
+   
+   $tx[5] -= 1970+100;      # -- convert to relative time 1970 => 0
+   $tx[3] -= 1;         # 1st day => day 0
+   $tx[6] = int($tx[5]/1000); $tx[5] %= 1000;
+
+   my(@si) = (qw(sec min hr day month yr mnium));
+   my(@pl) = (qw(secs mins hrs days months yrs mnia));
+   foreach my $f (@si) {
+      push(@out,$tx[$p].($tx[$p]>1?$pl[$p]:$f));
+      $m = $p+1 if($p&&$tx[$p]>0);
+      $p++;
+   }
+   @out = splice(@out,0,$m) if($m<$#out+1);
+   @out = reverse @out;
+   $to = join(" ",@out);
+
+   return $to.($ago?" ago":" ahead");
+}
+
+sub prettyNumber {
+   my($d,$opts) = @_;
+   my($n,$o);
+   $o = '';
+   do {
+      $o = ",$o" if($n&&$n%3==0);
+      $o = ($d%10).$o;
+      $d = int($d/10);
+      $n++;
+   } while($d>0);
+   return $o;
+}
+
+sub prettyTime {
+   my($t,$opts) = @_;
+
+   $t = sprintf("%.f",$t) if($t=~/e/);    # -- 1e-9 => 0.000000001
+   
+   my $to = '';
+   
+   my $p = 0; my $m = 1;
+   my @out;
+   my(@tx) = localtime($t);
+   
+   $tx[5] -= 1970;      # -- convert to relative time 1970 => 0
+   $tx[3] -= 1;         # 1st day => day 0
+   $tx[6] = int($tx[5]/1000); $tx[5] %= 1000;
+
+   unshift(@tx,int(($t-int($t))*1000));
+   unshift(@tx,int(($t-int($t))*1_000_000)%1000);
+   
+   my(@si) = (qw(us ms sec min hr day month yr mnium));
+   my(@pl) = (qw(us ms secs mins hrs days months yrs mnia));
+   foreach my $f (@si) {
+      push(@out,$tx[$p].($tx[$p]>1?$pl[$p]:$f));
+      $m = $p+1 if($p&&$tx[$p]>0);
+      $p++;
+   }
+   @out = splice(@out,0,$m) if($m<$#out+1);
+   @out = splice(@out,$#out-$opts->{precision}+1,$opts->{precision}) if($opts->{precision});
+   @out = reverse @out;
+   $to = join(" ",@out);
+
+   return $to; #.sprintf(" (%.6f)",$t);
+}
+
