@@ -7,8 +7,14 @@ my $VERSION = '0.0.3';
 #
 # License: GPLv3
 #
+# Description:
+#   Chrootx is for handling: create, delete, start and stop chrooted systems, identified with an ID
+#      optionally jchroot is used (if it exists) to improve isolation further.
+#   It's mainly targeted to simplify creating pseudo virtualization, e.g. if you run within a VM already,
+#      like a virtual server, chrootx allows to further create sub systems without any hassle.
+#
 # History:
-# 2014/12/04: 0.0.3: /var/lib/chrootx/fstab as default mount for all chroot, proper stop of chroot
+# 2014/12/04: 0.0.3: /var/lib/chrootx/fstab as default mount for all chroot, proper stop of [j]chroot
 # 2014/12/02: 0.0.2: jchroot included, which allows to set hostname and sub-process isolation
 # 2014/11/30: 0.0.1: first version
 
@@ -22,6 +28,8 @@ my $conf;
 $conf->{root} = '/var/lib/chrootx';
 $conf->{chroot} = '/usr/sbin/chroot';
 $conf->{jchroot} = '/usr/sbin/jchroot';
+
+conf("/etc/chrootx.conf") if(-e "/etc/chrootx.conf");
 
 my(@mnts);
 my(%_mounted,%_pid);
@@ -46,10 +54,7 @@ close(F);
 while($ARGV[0]=~/^-/) {
    $_ = shift(@ARGV);
    if(/^-conf/) {
-      my $c = conf(shift(@ARGV));
-      foreach (keys %$c) {
-         $conf->{$_} = $c->{$_};
-      }
+      conf(shift(@ARGV));
    }
    help() if(/^-help$/||/^-h/);
    if(/^-(\w+)/||/^--(\w+)/) {
@@ -72,7 +77,7 @@ my $cmd = shift(@ARGV);
 sub help {
 
    opendir(D,"$conf->{root}/templates");
-   my(@t) = sort grep(!/\./,readdir(D));
+   my(@t) = sort grep(!/^\./,readdir(D));
    closedir(D);
 
    my $types = join(', ',map { $_ = "'$_'" } @t);
@@ -107,7 +112,7 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    if(!existRoot($id)) {
       createRoot($id,$type);
    } else {
-      print "<$id> exist already\n";
+      print "<$id> exists already\n";
    }
 
 } elsif($cmd eq 'delete'||$cmd eq 'remove'||$cmd eq 'deinstall') {
@@ -115,13 +120,18 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    my $id = shift(@ARGV);
    $id = sane($id,'id');
    if(existRoot($id,{must=>1})) {
-      `rm -rf $conf->{root}/roots/$id`;
+      if(statusRoot($id)eq'stopped') {
+         `rm -rf $conf->{root}/roots/$id`;
+      } else {
+         print "<$id> is still running, cannot delete it\n";
+      }
    }
    
 } elsif($cmd eq 'start'||$cmd eq 'run') {
    help() unless($#ARGV>=0);
    my $id = shift(@ARGV);
    $id = sane($id,'id');
+
    push(@ARGV,"/bin/sh") if($#ARGV<0);
 
    existRoot($id,{must=>1});
@@ -140,10 +150,11 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    existRoot($id,{must=>1});
    if(statusRoot($id)eq'running') {
       my $pid = $_pid{$id};
+      kill 'KILL', $pid;
+      
       if(-e $conf->{jchroot}) {
-         kill 'KILL', $pid;
+         ;
       } else {
-         kill 'KILL', $pid;
          umountRoot($id);
       }
    } else {
@@ -340,7 +351,10 @@ sub sizeRoot {
 
 sub conf {
    my($f) = @_;
-   return readJSON($f);
+   my $c = readJSON($f);
+   foreach (keys %$c) {       # -- merge it ...
+      $conf->{$_} = $c->{$_};
+   }
 }
 
 sub sane {

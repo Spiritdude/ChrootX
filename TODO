@@ -1,5 +1,9 @@
 
-Issues:
-- In chroot root can kill processes outside of the host
-- In chroot cannot /bin/hostname myname - changes hostname of host
+Open Issues:
+
+(none)
+
+Done:
+- In chroot root can kill processes outside of the host - DONE since 0.0.3: with jchroot this cannot happen
+- In chroot cannot /bin/hostname myname - changes hostname of host - DONE since 0.0.3: jchroot allows to set hostname
 
