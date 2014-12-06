@@ -1,9 +1,10 @@
 #!/usr/bin/perl
 
 # -- CHROOTX, toolset for handling chrooted systems, written by Rene K. Mueller <spiritdude@gmail.com>
+#    http://github.com/Spiritdude/ChrootX/
 #
 my $APPNAME = 'chrootx';
-my $VERSION = '0.0.3';
+my $VERSION = '0.0.4';
 #
 # License: GPLv3
 #
@@ -14,12 +15,15 @@ my $VERSION = '0.0.3';
 #      like a virtual server, chrootx allows to further create sub systems without any hassle.
 #
 # History:
+# 2014/12/06: 0.0.4: more details of list/info
 # 2014/12/04: 0.0.3: /var/lib/chrootx/fstab as default mount for all chroot, proper stop of [j]chroot
 # 2014/12/02: 0.0.2: jchroot included, which allows to set hostname and sub-process isolation
 # 2014/11/30: 0.0.1: first version
 
 use POSIX;
 use JSON;
+use DateTime;
+use Time::HiRes qw(time);
 use strict;
 
 my $conf;
@@ -31,8 +35,9 @@ $conf->{jchroot} = '/usr/sbin/jchroot';
 
 conf("/etc/chrootx.conf") if(-e "/etc/chrootx.conf");
 
-my(@mnts);
-my(%_mounted,%_pid);
+my(@mnts);              # -- fstab for chroots
+
+my(%_mounted,$_pid);    # -- catched data
 
 if($> != 0) {
    print STDERR "ERROR: $APPNAME must be run as root!\n";
@@ -95,7 +100,7 @@ sub help {
       start <id>
       stop <id>
       info <id>
-      list
+      list                    (default)
 
 ";   
    exit 0;
@@ -105,20 +110,21 @@ print "$APPNAME: performed <$cmd>\n" if($conf->{verbose});
 
 if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    help() unless($#ARGV>=0);
-   my $id = shift(@ARGV);
-   $id = sane($id,'id');
+   my($id) = sane(shift(@ARGV),'id');
    my $type = 'minimal';
+
    $type = shift(@ARGV) if($#ARGV>=0);
+
    if(!existRoot($id)) {
       createRoot($id,$type);
    } else {
       print "<$id> exists already\n";
    }
 
-} elsif($cmd eq 'delete'||$cmd eq 'remove'||$cmd eq 'deinstall') {
+} elsif($cmd eq 'delete'||$cmd eq 'remove'||$cmd eq 'deinstall'||$cmd eq 'destroy') {
    help() unless($#ARGV>=0);
-   my $id = shift(@ARGV);
-   $id = sane($id,'id');
+   my($id) = sane(shift(@ARGV),'id');
+
    if(existRoot($id,{must=>1})) {
       if(statusRoot($id)eq'stopped') {
          `rm -rf $conf->{root}/roots/$id`;
@@ -129,14 +135,21 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    
 } elsif($cmd eq 'start'||$cmd eq 'run') {
    help() unless($#ARGV>=0);
-   my $id = shift(@ARGV);
-   $id = sane($id,'id');
+   my($id) = sane(shift(@ARGV),'id');
 
    push(@ARGV,"/bin/sh") if($#ARGV<0);
 
    existRoot($id,{must=>1});
 
+   my($i) = infoRoot($id);
+   $i->{stime} = time();
+   writeJSON("$conf->{root}/roots/$id/.info.json",$i);
+   
    if(-e $conf->{jchroot}) {
+      foreach (@mnts) {
+         my(@d) = split(/\s+/);
+         mkrdir("$conf->{root}/roots/$id$d[1]") unless(-e "$conf->{root}/roots/$id$d[1]");
+      }
       exec($conf->{jchroot},"-f","$conf->{root}/fstab","-n",$id,"$conf->{root}/roots/$id",@ARGV);
    } else {
       mountRoot($id);
@@ -145,11 +158,12 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    
 } elsif($cmd eq 'stop'||$cmd eq 'kill'||$cmd eq 'abort'||$cmd eq 'halt') {
    help() unless($#ARGV>=0);
-   my $id = shift(@ARGV);
-   $id = sane($id,'id');
+   my($id) = sane(shift(@ARGV),'id');
+
    existRoot($id,{must=>1});
+
    if(statusRoot($id)eq'running') {
-      my $pid = $_pid{$id};
+      my $pid = $_pid->{$id}->{pid};
       kill 'KILL', $pid;
       
       if(-e $conf->{jchroot}) {
@@ -163,20 +177,22 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    
 } elsif($cmd eq 'mv'||$cmd eq 'rename') {
    help() unless($#ARGV>=1);
-   my $id1 = shift(@ARGV);
-   my $id2 = shift(@ARGV);
+   my($id1) = sane(shift(@ARGV),'id');
+   my($id2) = sane(shift(@ARGV),'id');
+
    existRoot($id1,{must=>1});
+
    if(statusRoot($id1)eq'stopped') {
       existRoot($id2,{mustNot=>1});
       rename("$conf->{root}/roots/$id1","$conf->{root}/roots/$id2");
+
    } else {
       print "<$id1> is still running, please stop before rename\n";
    }
    
 } elsif($cmd eq 'info') {
    help() unless($#ARGV>=0);
-   my $id = shift(@ARGV);
-   $id = sane($id,'id');
+   my($id) = sane(shift(@ARGV),'id');
    $conf->{l}++;
    existRoot($id,{must=>1});
    dispRoot($id);
@@ -185,14 +201,26 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    help();
 
 } elsif($cmd eq 'list'||!$cmd) {
-
    opendir(D,"$conf->{root}/roots");
    my(@c) = grep(!/\./,readdir(D));
    closedir(D);
+
+   my $n = 0;
+   my $s;
+
+   $s->{running} = $s->{stopped} = 0;
+
    foreach my $c (sort @c) {
-      dispRoot($c);
+      my $i = dispRoot($c);
+      $s->{$i->{status}}++;
+      $n++;
    }
-   print "\tno chroot yet defined\n" if($#c<0);
+
+   if($n==0) {
+      print "\tno chroot yet created\n";
+   } else {
+      print "total $n chroot",($n>1?"s":"")," defined, running: $s->{running}, stopped: $s->{stopped}\n";
+   }
 
 } else {
    help();
@@ -240,21 +268,64 @@ sub existRoot {
 
 sub statusRoot {
    my($id) = @_;
-   if(!%_pid) {
-      foreach(split(/\n/,`ps auxw`)) {
+   
+   if(!$_pid) {
+      my %pr;
+      
+      my(@p) = split(/\n/,`ps -efw`);       # -- fetch all processes
+
+      shift(@p);           # -- drop 1st line
+
+      foreach (@p) {
          my(@d) = split(/\s+/);
+
+         # print "odd: $d[1] has already a parent: $pr{$d[1]}\n" if(defined $pr{$d[1]});
+         $pr{$d[1]} = $d[2];
+
          if(index($_,$conf->{jchroot})>=0&&/ -n (\S+)/) {
-            $_pid{$1} = $d[1];
+            $_pid->{$1}->{pid} = $d[1];
+            $_pid->{$1}->{pids}++;
+            # print "$1: $d[1]\n";
+
          } elsif(index($_,$conf->{chroot})>=0&&index($_,$conf->{root})>=0) {
             my $n = index($_,$conf->{root});
             my $s = substr($_,$n);
-            $_pid{$1} = $d[1] if($s =~ /^(\S+)/);
-         } elsif(/\/chrootx start (\S+)$/) {
-            $_pid{$1} = $d[1];
+            $_pid->{$1}->{pid} = $d[1] if($s =~ /^(\S+)/);
+
+         } elsif(/[\/ ]chrootx start (\S+)$/) {
+            $_pid->{$1}->{pid} = $d[1];
          }
       }
+
+      foreach (@p) {                      # -- check all processes again, determine which process belongs to which chroot
+         my(@d) = split(/\s+/);
+
+         # print "check $px ";
+         foreach my $id (keys %{$_pid}) {
+            my $done;
+            my(@pxs);
+            my $px = $d[1];
+
+            push(@pxs,$px);
+            while(defined $pr{$px}) {     # -- determine whether origin is chroot
+               $px = $pr{$px};
+               push(@pxs,$px);
+
+               # print " -> $px";
+               if($px==$_pid->{$id}->{pid}) {
+                  $_pid->{$id}->{pids}++;
+                  # print ", belongs to $id ($_pid->{$id}->{pid})\n";
+                  # print "$id: @pxs: $_\n";
+                  $done++;
+                  last;
+               } 
+            } 
+            last if($done);
+         }
+         # print "\n";
+      }
    }
-   return $_pid{$id}?"running":"stopped";
+   return $_pid->{$id}->{pid}?"running":"stopped";
    return isMounted("$conf->{root}/roots/$id/dev/pts")?"running":"stopped";
 }
 
@@ -304,6 +375,38 @@ sub umountRoot {
 
 sub dispRoot {
    my($id) = @_;
+   my $i = infoRoot($id);
+   
+   if($conf->{l}) {
+      print "   $id:\n";
+      foreach (qw(status processes type ctime stime uptime size)) {
+         next if(!defined $i->{$_});
+         my $v = $i->{$_};
+         if(/uptime/) {
+            $v = prettyTime($v);
+         } elsif(/time/) {
+            $v = prettyDate($v)." (".prettyAgo($i->{$_}).")" 
+         } else {
+            $v = prettyNumber($v) if($v=~/^[1-9]\d*$/);
+         }
+         if(1) {
+            print sprintf("%15s: $v\n",$_);
+         } else {
+            print "\t$_: $v\n";
+         }
+      }
+      print toJSON($i),"\n" if($conf->{verbose});
+      print "\n";
+      
+   } else {
+      my $p; $p = ": ".$i->{processes}." process".($i->{processes}>1?"es":"") if($i->{status}eq'running');
+      print sprintf("%20s: $i->{status}$p\n","$id ($i->{type})");
+   }
+   return $i;
+}
+
+sub infoRoot {
+   my($id) = @_;
    my($i) = readJSON("$conf->{root}/roots/$id/.info.json");
    my $p = "$conf->{root}/roots/$id";
 
@@ -321,26 +424,12 @@ sub dispRoot {
 
    $i->{status} = statusRoot($id);
 
-   if($conf->{l}) {
-      print "   $id:\n";
-      foreach (qw(status type ctime size)) {
-         my $v = $i->{$_};
-         $v = prettyDate($v)." (".prettyAgo($i->{$_}).")" if(/time/);
-         $v = prettyNumber($v) if($v=~/^[1-9]\d*$/);
-         print "\t$_: $v\n";
-      }
-      print toJSON($i),"\n" if($conf->{verbose});
-      print "\n";
-      
-   } else {
-      print sprintf("%20s: $i->{status}\n","$id ($i->{type})");
+   if($i->{status}eq'running') {
+      $i->{processes} = $_pid->{$id}->{pids};
+      $i->{uptime} = time()-$i->{stime};
    }
-   if(1) {
-      foreach (qw(status)) {
-         delete $i->{$_};
-      }
-      writeJSON("$conf->{root}/roots/$id/.info.json",$i);
-   }
+   
+   return $i;
 }
 
 sub sizeRoot {
@@ -450,9 +539,9 @@ sub prettyAgo {
 
    my $p = 0; my $m = 1;
    my @out;
-   my(@tx) = localtime($t);
+   my(@tx) = _localtime($t);
    
-   $tx[5] -= 1970+100;      # -- convert to relative time 1970 => 0
+   $tx[5] -= 1970;      # -- convert to relative time 1970 => 0
    $tx[3] -= 1;         # 1st day => day 0
    $tx[6] = int($tx[5]/1000); $tx[5] %= 1000;
 
@@ -483,6 +572,12 @@ sub prettyNumber {
    return $o;
 }
 
+sub _localtime {     
+   my($sec) = @_;
+   my $dt = DateTime->from_epoch(epoch=>$sec);
+   return ($dt->second,$dt->minute,$dt->hour,$dt->day,$dt->month-1,$dt->year);
+}
+
 sub prettyTime {
    my($t,$opts) = @_;
 
@@ -492,7 +587,7 @@ sub prettyTime {
    
    my $p = 0; my $m = 1;
    my @out;
-   my(@tx) = localtime($t);
+   my(@tx) = _localtime($t);
    
    $tx[5] -= 1970;      # -- convert to relative time 1970 => 0
    $tx[3] -= 1;         # 1st day => day 0

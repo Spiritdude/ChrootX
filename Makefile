@@ -1,10 +1,11 @@
 DATE=`date +%Y-%m-%d`
 NAME=ChrootX
-VERSION=0.0.3
+VERSION=0.0.4
 
 requirements::
 	apt-get install bash-static busybox-static debootstrap
 	git clone https://github.com/vincentbernat/jchroot; cd jchroot; make
+	cpan JSON DateTime Time::HiRes
 
 install::
 	cp -f chrootx /usr/sbin/
