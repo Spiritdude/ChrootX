@@ -188,6 +188,7 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
          mkrdir("$conf->{root}/roots/$id$d[1]") unless(-e "$conf->{root}/roots/$id$d[1]");
       }
       exec($conf->{jchroot},"-f","$conf->{root}/fstab","-n",$id,"$conf->{root}/roots/$id",@ARGV);
+
    } else {
       mountRoot($id);
       exec("/usr/sbin/chroot","$conf->{root}/roots/$id",@ARGV);
@@ -200,14 +201,16 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    existRoot($id,{must=>1});
 
    if(statusRoot($id)eq'running') {
-      my $pid = $_pid->{$id}->{pid};
-      kill 'KILL', $pid;
+      foreach (@{$_pid->{$id}->{pid}}) {
+         kill 'KILL', $_;
+      }
       
       if($conf->{jchroot}) {
          ;
       } else {
          umountRoot($id);
       }
+
    } else {
       print "<$id> is not running\n";
    }
@@ -380,23 +383,25 @@ sub statusRoot {
                $_pid->{$1}->{pid} = $d[1];
             }
 
-         } elsif($conf->{jchroot}) {    # -- let's go through /proc/ and determine chroot via mounts there ...
+         } elsif(0) {
             open(F,"/proc/$d[1]/mounts"); my(@m) = <F>; close(F);
             foreach (@m) {
                my $p = index($_,"$conf->{root}/roots/");
                my $t = substr($_,$p+length("$conf->{root}/roots/"));
                if($p>=0&&$t=~/([^\/]+)/) {
-                  $_pid->{$1}->{pid} = $d[1];
+                  push(@{$_pid->{$1}->{pid}},$d[1]);
                   $_pid->{$1}->{pids}++;
+                  last;
                }
             }
-         } else {
+         } else {    # -- simplest way so far, independent if jchroot or chroot
             $_ = readlink("/proc/$d[1]/exe");
             my $p = index($_,"$conf->{root}/roots/");
             my $t = substr($_,$p+length("$conf->{root}/roots/"));
             if($p>=0&&$t=~/([^\/]+)/) {
-               $_pid->{$1}->{pid} = $d[1];
+               push(@{$_pid->{$1}->{pid}},$d[1]);
                $_pid->{$1}->{pids}++;
+               
             }
          }
       }
