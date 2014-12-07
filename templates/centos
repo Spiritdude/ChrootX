@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# == CentOS
+# written by Rene K. Mueller <spiritdude@gmail.com>
+#    installs centos-6 using rinse
+
+ID=`basename $1`
+rinse --arch amd64 --directory $1 --distribution centos-6
+
+# -- set hostname
+mkdir -p $1/etc; echo "${ID}" > $1/etc/hostname
+#chroot $1 /bin/sh -c "/bin/hostname ${ID}"
+
+echo "rootfs / rootfs rw 0 0" > $1/etc/mtab
+

@@ -1,9 +1,9 @@
 DATE=`date +%Y-%m-%d`
 NAME=ChrootX
-VERSION=0.0.5
+VERSION=0.0.6
 
 requirements::
-	apt-get install bash-static busybox-static debootstrap
+	apt-get install bash-static busybox-static debootstrap rpm yum yum-utils rinse qemu
 	git clone https://github.com/vincentbernat/jchroot; cd jchroot; make
 	cpan JSON DateTime Time::HiRes
 

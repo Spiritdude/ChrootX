@@ -4,7 +4,7 @@
 #    http://github.com/Spiritdude/ChrootX/
 #
 my $APPNAME = 'chrootx';
-my $VERSION = '0.0.5';
+my $VERSION = '0.0.6';
 #
 # License: GPLv3
 #
@@ -15,6 +15,7 @@ my $VERSION = '0.0.5';
 #      like a virtual server, chrootx allows to further create sub systems without any hassle.
 #
 # History:
+# 2014/12/08: 0.0.6: support of file-based filesystem using qemu-img
 # 2014/12/08: 0.0.5: clone/copy added
 # 2014/12/06: 0.0.4: more details of list/info
 # 2014/12/04: 0.0.3: /var/lib/chrootx/fstab as default mount for all chroot, proper stop of [j]chroot
@@ -40,13 +41,7 @@ my(@mnts);              # -- fstab for chroots
 
 my(%_mounted,$_pid);    # -- catched data
 
-if($> != 0) {
-   print STDERR "ERROR: $APPNAME must be run as root!\n";
-   exit -1;
-}
-
-mkdir $conf->{root} unless(-e $conf->{root});
-mkdir "$conf->{root}/roots" unless(-e "$conf->{root}/roots");
+my(%ff) = ('raw'=>1, 'cloop'=>2, 'cow'=>3, 'qcow'=>4, 'qcow2'=>5, 'vmdk'=>6, 'vdi'=>7);
 
 # -- fetch default mounts in chroot
 open(F,"$conf->{root}/fstab");
@@ -63,7 +58,10 @@ while($ARGV[0]=~/^-/) {
       conf(shift(@ARGV));
    }
    help() if(/^-help$/||/^-h/);
-   if(/^-(\w+)/||/^--(\w+)/) {
+   if(/^-(\w+)=(.*)$/||/^--(\w+)=(.*)$/) {
+      $conf->{$1} = $2;
+
+   } elsif(/^-(\w+)/||/^--(\w+)/) {
       my $v = $1;
       if($v eq 'version') {
          print "$APPNAME $VERSION\n"; 
@@ -80,6 +78,14 @@ while($ARGV[0]=~/^-/) {
 
 my $cmd = shift(@ARGV);
 
+if($> != 0) {
+   print STDERR "ERROR: $APPNAME must be run as root!\n";
+   exit -1;
+}
+
+mkdir $conf->{root} unless(-e $conf->{root});
+mkdir "$conf->{root}/roots" unless(-e "$conf->{root}/roots");
+
 sub help {
 
    opendir(D,"$conf->{root}/templates");
@@ -87,6 +93,7 @@ sub help {
    closedir(D);
 
    my $types = join(', ',map { $_ = "'$_'" } @t);
+   my $ftypes = join(', ',map { $_ = "'$_'" } sort keys %ff);
    
    print "$APPNAME $VERSION usage: [<options>] <command> [<arguments>]
    options:
@@ -94,13 +101,16 @@ sub help {
       -conf <file>            consider configuration file
       -version or --version   display version
       -l                      long output
+      --image=<type>          use file-based image
+                                 type: $ftypes
       
    commands:
-      create <id> [<type>]    type: $types
-      clone <src> <dst>       clone
-      delete <id>
-      start <id>
-      stop <id>
+      create <id> [<type>]    aka new, install
+                                 type: $types
+      clone <src> <dst>       clone existing chroot
+      delete <id>             aka deinstall, remove, destroy
+      start <id>              aka run
+      stop <id>               aka halt, kill, abort
       info <id>
       list                    (default)
 
@@ -129,7 +139,11 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
 
    if(existRoot($id,{must=>1})) {
       if(statusRoot($id)eq'stopped') {
+         umountRootImage($id);
          `rm -rf $conf->{root}/roots/$id`;
+         foreach (keys %ff) {
+            unlink("$conf->{root}/roots/$id.$_");
+         }
       } else {
          print "<$id> is still running, cannot delete it\n";
       }
@@ -145,6 +159,9 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
 
    my($i) = infoRoot($id);
    $i->{stime} = time();
+
+   mountRootImage($id);
+   
    writeJSON("$conf->{root}/roots/$id/.info.json",$i);
    
    if(-e $conf->{jchroot}) {
@@ -220,7 +237,7 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
 
 } elsif($cmd eq 'list'||!$cmd) {
    opendir(D,"$conf->{root}/roots");
-   my(@c) = grep(!/\./,readdir(D));
+   my(@c) = grep((!/\./)&&-d "$conf->{root}/roots/$_",readdir(D));
    closedir(D);
 
    my $n = 0;
@@ -231,13 +248,14 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    foreach my $c (sort @c) {
       my $i = dispRoot($c);
       $s->{$i->{status}}++;
+      $s->{size} += $i->{size};
       $n++;
    }
 
    if($n==0) {
       print "\tno chroot yet created\n";
    } else {
-      print "total $n chroot",($n>1?"s":"")," defined, running: $s->{running}, stopped: $s->{stopped}\n";
+      print "total $n chroot",($n>1?"s":"")," defined, running: $s->{running}, stopped: $s->{stopped}, disk usage: ",prettyNumber($s->{size})," bytes\n";
    }
 
 } else {
@@ -255,13 +273,29 @@ sub createRoot {
       $i->{ctime} = time();
       $i->{type} = $type if($type);
 
+      if($conf->{image}) {
+         $i->{image} = $conf->{image};
+         `qemu-img create -f $conf->{image} $conf->{root}/roots/$id.$conf->{image} 4G`;
+         mountRootImage($id);
+      }
+      
       writeJSON("$conf->{root}/roots/$id/.info.json",$i);
 
       if(-e "$conf->{root}/templates/$type") {
-         `$conf->{root}/templates/$type $conf->{root}/roots/$id`;
+         if(1) {
+            if(fork()==0) {
+               print "\tapply template $type\n";
+               exec("$conf->{root}/templates/$type","$conf->{root}/roots/$id",@ARGV);
+            } else {
+               wait();
+            }
+         } else {
+            `$conf->{root}/templates/$type $conf->{root}/roots/$id`;
+         }
 
       } elsif($type=~/^clone:(\S+)/) {
          my $ido = $1;
+         print "\tcloning $ido\n";
          `cd $conf->{root}/roots/$ido && tar cf - * | (cd $conf->{root}/roots/$id; tar xf -)`;
          if(0) {
             my $io = infoRoot($ido);
@@ -400,6 +434,59 @@ sub umountRoot {
    }
 }
 
+sub mountRootImage {
+   my($id) = @_;
+   `modprobe nbd`;
+   foreach (keys %ff) {
+      if(-e "$conf->{root}/roots/$id.$_") {
+         print "$id is file-based filesystem ($_)\n" if($conf->{verbose});
+         mountNBD("$conf->{root}/roots/$id.$_","$conf->{root}/roots/$id");
+         last;
+      }
+   }
+}
+
+sub umountRootImage {
+   my($id) = @_;
+   foreach (split(/\n/,`mount`)) {
+      my(@d) = split(/\s+/);
+      if($d[2] eq "$conf->{root}/roots/$id") {
+         `umount -f $conf->{root}/roots/$id`;
+         last;
+      }
+   }
+}
+
+sub mountNBD {
+   my($dev,$mnt) = @_;
+   my $d = 0;
+   my $mnted;
+   foreach (split(/\n/,`mount`)) {
+      my(@d) = split(/\s+/);
+      if($d[2] eq $mnt) {
+         $mnted++;
+      }
+      if(/\/nbd(\d+)/) {
+         $d = $1+1 if($1>=$d);
+      }
+   }
+   unless($mnted) {
+      print "mounting $dev to $mnt via /dev/nbd$d\n" if($conf->{verbose});
+      `qemu-nbd -c /dev/nbd$d $dev`;
+
+      unless(-e "/dev/nbd${d}p1") {
+         print "create single partion and mkfs ext4 on $dev\n" if($conf->{verbose});
+
+         print "\tformating image\n";
+         `echo "o\nn\np\n1\n\n\nw\nq" | fdisk /dev/nbd$d 2> /dev/null`;    # -- create single partition
+
+         print "\tcreating fs\n";
+         `mkfs.ext4 /dev/nbd${d}p1 2> /dev/null`;                          # -- make filesystem
+      }
+      `mount /dev/nbd${d}p1 $mnt`;
+   }
+}
+   
 sub dispRoot {
    my($id) = @_;
    my $i = infoRoot($id);
@@ -439,14 +526,14 @@ sub infoRoot {
    my($i) = readJSON("$conf->{root}/roots/$id/.info.json");
    my $p = "$conf->{root}/roots/$id";
 
-   if($conf->{l}) {
+   #if($conf->{l}) {
       unless($i->{size}) {
          $i->{size} = sizeRoot($id);
       }
       unless($i->{ctime}) {
          $i->{ctime} = (stat("$conf->{root}/roots/$id"))[10];
       }
-   }
+   #}
    unless($i->{type}) {
       $i->{type} = 'custom';
    }
