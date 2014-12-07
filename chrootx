@@ -4,7 +4,7 @@
 #    http://github.com/Spiritdude/ChrootX/
 #
 my $APPNAME = 'chrootx';
-my $VERSION = '0.0.4';
+my $VERSION = '0.0.5';
 #
 # License: GPLv3
 #
@@ -15,6 +15,7 @@ my $VERSION = '0.0.4';
 #      like a virtual server, chrootx allows to further create sub systems without any hassle.
 #
 # History:
+# 2014/12/08: 0.0.5: clone/copy added
 # 2014/12/06: 0.0.4: more details of list/info
 # 2014/12/04: 0.0.3: /var/lib/chrootx/fstab as default mount for all chroot, proper stop of [j]chroot
 # 2014/12/02: 0.0.2: jchroot included, which allows to set hostname and sub-process isolation
@@ -96,6 +97,7 @@ sub help {
       
    commands:
       create <id> [<type>]    type: $types
+      clone <src> <dst>       clone
       delete <id>
       start <id>
       stop <id>
@@ -189,6 +191,22 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    } else {
       print "<$id1> is still running, please stop before rename\n";
    }
+
+} elsif($cmd eq 'clone'||$cmd eq 'copy') {
+   help() unless($#ARGV>=1);
+   my($id1) = sane(shift(@ARGV),'id');
+   my($id2) = sane(shift(@ARGV),'id');
+
+   existRoot($id1,{must=>1});
+
+   if(statusRoot($id1)eq'stopped') {
+      existRoot($id2,{mustNot=>1});
+
+      createRoot($id2,"clone:$id1");
+
+   } else {
+      print "<$id1> is still running, please stop before clone/copy\n";
+   }
    
 } elsif($cmd eq 'info') {
    help() unless($#ARGV>=0);
@@ -241,6 +259,15 @@ sub createRoot {
 
       if(-e "$conf->{root}/templates/$type") {
          `$conf->{root}/templates/$type $conf->{root}/roots/$id`;
+
+      } elsif($type=~/^clone:(\S+)/) {
+         my $ido = $1;
+         `cd $conf->{root}/roots/$ido && tar cf - * | (cd $conf->{root}/roots/$id; tar xf -)`;
+         if(0) {
+            my $io = infoRoot($ido);
+            $i->{type} = $io->{type};
+         }
+         
       } else {
          print "\tERROR: <$type> template not found\n";
          exit 1;
@@ -382,18 +409,20 @@ sub dispRoot {
       foreach (qw(status processes type ctime stime uptime size)) {
          next if(!defined $i->{$_});
          my $v = $i->{$_};
-         if(/uptime/) {
+         if(/uptime/||$conf->{types}->{$_}eq'time') {
             $v = prettyTime($v);
-         } elsif(/time/) {
+         } elsif(/time/||$conf->{types}->{$_}eq'date') {
             $v = prettyDate($v)." (".prettyAgo($i->{$_}).")" 
          } else {
             $v = prettyNumber($v) if($v=~/^[1-9]\d*$/);
          }
          if(1) {
-            print sprintf("%15s: $v\n",$_);
+            print sprintf("%15s: $v",$_);
          } else {
-            print "\t$_: $v\n";
+            print "\t$_: $v";
          }
+         print " ".$conf->{units}->{$_} if($conf->{units}->{$_});
+         print "\n";
       }
       print toJSON($i),"\n" if($conf->{verbose});
       print "\n";
@@ -427,6 +456,9 @@ sub infoRoot {
    if($i->{status}eq'running') {
       $i->{processes} = $_pid->{$id}->{pids};
       $i->{uptime} = time()-$i->{stime};
+   } else {
+      delete $i->{processes};
+      delete $i->{uptime};
    }
    
    return $i;

@@ -1,6 +1,6 @@
 DATE=`date +%Y-%m-%d`
 NAME=ChrootX
-VERSION=0.0.4
+VERSION=0.0.5
 
 requirements::
 	apt-get install bash-static busybox-static debootstrap
@@ -9,6 +9,7 @@ requirements::
 
 install::
 	cp -f chrootx /usr/sbin/
+	cp -f chrootx.conf /etc/
 	cp -f jchroot/jchroot /usr/sbin/
 	mkdir -p /var/lib/chrootx/templates
 	cp -rp templates /var/lib/chrootx
