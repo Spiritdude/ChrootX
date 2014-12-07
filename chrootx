@@ -1,7 +1,8 @@
 #!/usr/bin/perl
 
-# -- CHROOTX, toolset for handling chrooted systems, written by Rene K. Mueller <spiritdude@gmail.com>
-#    http://github.com/Spiritdude/ChrootX/
+# -- CHROOTX, written by Rene K. Mueller <spiritdude@gmail.com>
+#       toolset for handling chrooted systems, 
+#       http://github.com/Spiritdude/ChrootX/
 #
 my $APPNAME = 'chrootx';
 my $VERSION = '0.0.6';
@@ -34,6 +35,9 @@ my $conf;
 $conf->{root} = '/var/lib/chrootx';
 $conf->{chroot} = '/usr/sbin/chroot';
 $conf->{jchroot} = '/usr/sbin/jchroot';
+$conf->{size} = '4G';
+$conf->{format} = 'qcow2';
+$conf->{fs} = 'ext4';
 
 conf("/etc/chrootx.conf") if(-e "/etc/chrootx.conf");
 
@@ -85,6 +89,9 @@ if($> != 0) {
 
 mkdir $conf->{root} unless(-e $conf->{root});
 mkdir "$conf->{root}/roots" unless(-e "$conf->{root}/roots");
+mkdir "$conf->{root}/imgs" unless(-e "$conf->{root}/imgs");
+
+delete $conf->{jchroot} unless(-e $conf->{jchroot});
 
 sub help {
 
@@ -101,19 +108,30 @@ sub help {
       -conf <file>            consider configuration file
       -version or --version   display version
       -l                      long output
-      --image=<type>          use file-based image
+      -i                      image-based root 
+      --format=<type>         image format (default: $conf->{format})
                                  type: $ftypes
+      --size=<size>           size of image (default: $conf->{size})
+                                 e.g. '200M', '2G' etc
+      --fs=<type>             filesystem in the image (default: $conf->{fs})
       
    commands:
-      create <id> [<type>]    aka new, install
+      create <id> [<type>]    aka 'new', 'install', (default type: 'minimal')
                                  type: $types
-      clone <src> <dst>       clone existing chroot
-      delete <id>             aka deinstall, remove, destroy
-      start <id>              aka run
-      stop <id>               aka halt, kill, abort
-      info <id>
-      list                    (default)
+      clone <src> <dst>       clone existing chroot, same as 'new <src> clone:<dst>'
+      delete <id>             aka 'deinstall', 'remove', 'destroy'
+      start <id>              aka 'run'
+      stop <id>               aka 'halt', 'kill', 'abort'
+      info <id>               aka 'status'
+      list                    default action, use -l to list details
 
+   examples:
+      sudo chrootx new sys01 
+      sudo chrootx new sys02 ubuntu
+      sudo chrootx -i new sys04 clone:sys02
+      sudo chrootx -i --size=60G new sys05 clone:sys03
+      sudo chroot clone sys03 sys06
+      
 ";   
    exit 0;
 }
@@ -142,7 +160,7 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
          umountRootImage($id);
          `rm -rf $conf->{root}/roots/$id`;
          foreach (keys %ff) {
-            unlink("$conf->{root}/roots/$id.$_");
+            unlink("$conf->{root}/imgs/$id.$_");
          }
       } else {
          print "<$id> is still running, cannot delete it\n";
@@ -164,7 +182,7 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    
    writeJSON("$conf->{root}/roots/$id/.info.json",$i);
    
-   if(-e $conf->{jchroot}) {
+   if($conf->{jchroot}) {
       foreach (@mnts) {
          my(@d) = split(/\s+/);
          mkrdir("$conf->{root}/roots/$id$d[1]") unless(-e "$conf->{root}/roots/$id$d[1]");
@@ -185,7 +203,7 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
       my $pid = $_pid->{$id}->{pid};
       kill 'KILL', $pid;
       
-      if(-e $conf->{jchroot}) {
+      if($conf->{jchroot}) {
          ;
       } else {
          umountRoot($id);
@@ -204,6 +222,9 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    if(statusRoot($id1)eq'stopped') {
       existRoot($id2,{mustNot=>1});
       rename("$conf->{root}/roots/$id1","$conf->{root}/roots/$id2");
+      foreach (keys %ff) {
+         rename("$conf->{root}/imgs/$id1.$_","$conf->{root}/imgs/$id2.$_");
+      }
 
    } else {
       print "<$id1> is still running, please stop before rename\n";
@@ -225,7 +246,7 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
       print "<$id1> is still running, please stop before clone/copy\n";
    }
    
-} elsif($cmd eq 'info') {
+} elsif($cmd eq 'info'||$cmd eq 'status') {
    help() unless($#ARGV>=0);
    my($id) = sane(shift(@ARGV),'id');
    $conf->{l}++;
@@ -273,9 +294,10 @@ sub createRoot {
       $i->{ctime} = time();
       $i->{type} = $type if($type);
 
-      if($conf->{image}) {
-         $i->{image} = $conf->{image};
-         `qemu-img create -f $conf->{image} $conf->{root}/roots/$id.$conf->{image} 4G`;
+      if($conf->{i}) {
+         $i->{format} = $conf->{format};
+         print "\tcreate image ($conf->{format}, $conf->{size})\n";
+         `qemu-img create -f $conf->{format} $conf->{root}/imgs/$id.$conf->{format} $conf->{size}`;
          mountRootImage($id);
       }
       
@@ -343,18 +365,39 @@ sub statusRoot {
          # print "odd: $d[1] has already a parent: $pr{$d[1]}\n" if(defined $pr{$d[1]});
          $pr{$d[1]} = $d[2];
 
-         if(index($_,$conf->{jchroot})>=0&&/ -n (\S+)/) {
-            $_pid->{$1}->{pid} = $d[1];
-            $_pid->{$1}->{pids}++;
-            # print "$1: $d[1]\n";
+         if(0) {
+            if(index($_,$conf->{jchroot})>=0&&/ -n (\S+)/) {
+               $_pid->{$1}->{pid} = $d[1];
+               $_pid->{$1}->{pids}++;
+               # print "$1: $d[1]\n";
+   
+            } elsif(index($_,$conf->{chroot})>=0&&index($_,$conf->{root})>=0) {
+               my $n = index($_,$conf->{root});
+               my $s = substr($_,$n);
+               $_pid->{$1}->{pid} = $d[1] if($s =~ /^(\S+)/);
+   
+            } elsif(/[\/ ]chrootx start (\S+)$/) {
+               $_pid->{$1}->{pid} = $d[1];
+            }
 
-         } elsif(index($_,$conf->{chroot})>=0&&index($_,$conf->{root})>=0) {
-            my $n = index($_,$conf->{root});
-            my $s = substr($_,$n);
-            $_pid->{$1}->{pid} = $d[1] if($s =~ /^(\S+)/);
-
-         } elsif(/[\/ ]chrootx start (\S+)$/) {
-            $_pid->{$1}->{pid} = $d[1];
+         } elsif($conf->{jchroot}) {    # -- let's go through /proc/ and determine chroot via mounts there ...
+            open(F,"/proc/$d[1]/mounts"); my(@m) = <F>; close(F);
+            foreach (@m) {
+               my $p = index($_,"$conf->{root}/roots/");
+               my $t = substr($_,$p+length("$conf->{root}/roots/"));
+               if($p>=0&&$t=~/([^\/]+)/) {
+                  $_pid->{$1}->{pid} = $d[1];
+                  $_pid->{$1}->{pids}++;
+               }
+            }
+         } else {
+            $_ = readlink("/proc/$d[1]/exe");
+            my $p = index($_,"$conf->{root}/roots/");
+            my $t = substr($_,$p+length("$conf->{root}/roots/"));
+            if($p>=0&&$t=~/([^\/]+)/) {
+               $_pid->{$1}->{pid} = $d[1];
+               $_pid->{$1}->{pids}++;
+            }
          }
       }
 
@@ -436,11 +479,11 @@ sub umountRoot {
 
 sub mountRootImage {
    my($id) = @_;
-   `modprobe nbd`;
+   `modprobe nbd 2> /dev/null`;
    foreach (keys %ff) {
-      if(-e "$conf->{root}/roots/$id.$_") {
+      if(-e "$conf->{root}/imgs/$id.$_") {
          print "$id is file-based filesystem ($_)\n" if($conf->{verbose});
-         mountNBD("$conf->{root}/roots/$id.$_","$conf->{root}/roots/$id");
+         mountNBD("$conf->{root}/imgs/$id.$_","$conf->{root}/roots/$id");
          last;
       }
    }
@@ -452,6 +495,8 @@ sub umountRootImage {
       my(@d) = split(/\s+/);
       if($d[2] eq "$conf->{root}/roots/$id") {
          `umount -f $conf->{root}/roots/$id`;
+         my($d) = ($d[0]=~/nbd(\d+)/);
+         `qemu-nbd -d /dev/nbd$d`;
          last;
       }
    }
@@ -467,7 +512,7 @@ sub mountNBD {
          $mnted++;
       }
       if(/\/nbd(\d+)/) {
-         $d = $1+1 if($1>=$d);
+         $d = $1+1 if($1>=$d);         # -- get next free nbd id
       }
    }
    unless($mnted) {
@@ -475,13 +520,13 @@ sub mountNBD {
       `qemu-nbd -c /dev/nbd$d $dev`;
 
       unless(-e "/dev/nbd${d}p1") {
-         print "create single partion and mkfs ext4 on $dev\n" if($conf->{verbose});
+         print "create single partition and mkfs ext4 on $dev\n" if($conf->{verbose});
 
-         print "\tformating image\n";
+         print "\tpartitioning image\n";
          `echo "o\nn\np\n1\n\n\nw\nq" | fdisk /dev/nbd$d 2> /dev/null`;    # -- create single partition
 
-         print "\tcreating fs\n";
-         `mkfs.ext4 /dev/nbd${d}p1 2> /dev/null`;                          # -- make filesystem
+         print "\tcreating fs ($conf->{fs})\n";
+         `mkfs -t $conf->{fs} /dev/nbd${d}p1 2> /dev/null`;                          # -- make filesystem
       }
       `mount /dev/nbd${d}p1 $mnt`;
    }
@@ -544,8 +589,9 @@ sub infoRoot {
       $i->{processes} = $_pid->{$id}->{pids};
       $i->{uptime} = time()-$i->{stime};
    } else {
-      delete $i->{processes};
-      delete $i->{uptime};
+      foreach(qw(processes uptime stime)) {
+         delete $i->{$_};
+      }
    }
    
    return $i;

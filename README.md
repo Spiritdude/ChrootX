@@ -1,5 +1,7 @@
 =CHROOTX=
-Small toolbox to create, delete, start and stop chrooted environments.
+Small toolbox to create, delete, start and stop chrooted environments, allowing lightweight virtualization within virtual servers again.
+
+Version: 0.0.6
 
 License: GPLv3
 
@@ -40,20 +42,36 @@ Platforms: Linux (Ubuntu 14.04 or later)
 % sudo chroot stop ch01
 
 % sudo chroot help
-chrootx 0.0.1 usage: [<options>] <command> [<arguments>]
+chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
    options:
       -verbose or -v or -vv   increase verbosity
       -conf <file>            consider configuration file
+      -version or --version   display version
       -l                      long output
+      -i                      image-based root 
+      --format=<type>         image format (default: qcow2)
+                                 type: 'cloop', 'cow', 'qcow', 'qcow2', 'raw', 'vdi', 'vmdk'
+      --size=<size>           size of image (default: 4G)
+                                 e.g. '200M', '2G' etc
+      --fs=<type>             filesystem in the image (default: ext4)
       
    commands:
-      create <id> [<type>]    type: 'bash', 'busybox', 'debian', 'minimal', 'nano', 'ubuntu'
-      delete <id>
-      start <id>
-      stop <id>
+      create <id> [<type>]    aka 'new', 'install', (default type: 'minimal')
+                                 type: 'bash', 'busybox', 'centos', 'debian', 'fedora', 
+                                       'minimal', 'nano', 'opensuse', 'redhat', 'ubuntu'
+      clone <src> <dst>       clone existing chroot, same as 'new <src> clone:<dst>'
+      delete <id>             aka 'deinstall', 'remove', 'destroy'
+      start <id>              aka 'run'
+      stop <id>               aka 'halt', 'kill', 'abort'
       info <id>
-      list
-        
+      list                    default action, use -l to list details
+
+   examples:
+      sudo chrootx new sys01 
+      sudo chrootx new sys02 ubuntu
+      sudo chrootx -i new sys04 clone:sys02
+      sudo chrootx -i --size=60G new sys05 clone:sys03
+      sudo chroot clone sys03 sys06
 </pre>
 
 -- End of README.md --
