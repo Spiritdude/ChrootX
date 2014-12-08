@@ -1,6 +1,6 @@
 #ChrootX
 
-Small toolbox to create, clone, delete, start and stop chrooted environments, allowing lightweight virtualization within virtual servers again, where LXC or Qemu might fail to run.
+Small toolbox to create, clone, delete, start and stop chrooted environments, allowing lightweight virtualization within virtual servers again, where LXC or Qemu/KVM might fail to run.
 
 Version: <b>0.0.7</b>
 

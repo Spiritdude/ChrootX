@@ -13,8 +13,8 @@ my $VERSION = '0.0.7';
 #   Chrootx is for handling: create, clone, delete, start and stop chrooted systems, identified with 
 #      an ID optionally jchroot is used (if it exists) to improve isolation further.
 #   It's mainly targeted to simplify creating pseudo virtualization, e.g. if you run within a VM already,
-#      like a virtual server where lxc or qemu won't run due lack of functionality, chrootx allows to 
-#      further create sub systems without any hassle, 
+#      like a virtual server where lxc or qemu-kvm won't run due lack of functionality, chrootx allows to 
+#      further create sub systems without any hassle.
 #
 # History:
 # 2014/12/08: 0.0.6: support of file-based filesystem using qemu-img
