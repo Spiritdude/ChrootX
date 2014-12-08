@@ -107,6 +107,5 @@ and see if it works, in case it fails, remove `jchroot` again:
 ```
 and keep using `chrootx` bare.
 
-<br><br><br><center>
--- End of README.md --
-</center>
+<br><br><br>
+--- End of README.md ---
