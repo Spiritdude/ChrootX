@@ -30,7 +30,7 @@ Platforms: <b>Linux</b> (Debian / Ubuntu 14.04 or later)
    ch01 (minimal): running
       ch02 (bash): stopped
 
-% sudo chroot -l
+% sudo chrootx -l
    ch01:
         status: running
      processes: 2
@@ -44,9 +44,9 @@ Platforms: <b>Linux</b> (Debian / Ubuntu 14.04 or later)
          ctime: 2014/11/30 18:24:58.000 (1day 21hrs 35mins 48secs ago)
           size: 3,969,024
 
-% sudo chroot stop ch01
+% sudo chrootx stop ch01
 
-% sudo chroot help
+% sudo chrootx help
 chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
    options:
       -verbose or -v or -vv   increase verbosity
@@ -76,7 +76,7 @@ chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
       sudo chrootx new sys02 ubuntu
       sudo chrootx -i new sys03 clone:sys02
       sudo chrootx -i --size=60G new sys04 clone:sys02
-      sudo chroot clone sys03 sys05
+      sudo chrootx clone sys03 sys05
 ```
 
 -- End of README.md --
