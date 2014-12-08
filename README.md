@@ -73,7 +73,7 @@ chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
                                        'minimal', 'nano', 'opensuse', 'redhat', 'ubuntu'
       clone <src> <dst>       clone existing chroot, same as 'new <src> clone:<dst>'
       delete <id>             aka 'deinstall', 'remove', 'destroy'
-      start <id>              aka 'run'
+      start <id> [<cmds>] ..  aka 'run'
       stop <id>               aka 'halt', 'kill', 'abort'
       info <id>
       list                    default action, use -l to list details
@@ -84,6 +84,7 @@ chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
       sudo chrootx -i new sys03 clone:sys02
       sudo chrootx -i --size=60G new sys04 clone:sys02
       sudo chrootx clone sys03 sys05
+      sudo chrootx sys05 /etc/init.d/lighttpd start
 ```
 
 ##JChroot
