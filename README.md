@@ -19,6 +19,7 @@ Platforms: <b>Linux</b> (Debian / Ubuntu 14.04 or later)
 ```
 
 ##Usage
+All chroot environments are identified with an id:
 ```
 % sudo chrootx create ch01
 
