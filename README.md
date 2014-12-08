@@ -37,13 +37,13 @@ All chroot environments are identified with an id:
      processes: 2
           type: minimal
          ctime: 2014/11/30 18:23:51.000 (1day 21hrs 34mins 47secs ago)
-          size: 3,973,120
+          size: 3,973,120 bytes
         
    ch02:
         status: stopped
           type: bash
          ctime: 2014/11/30 18:24:58.000 (1day 21hrs 35mins 48secs ago)
-          size: 3,969,024
+          size: 3,969,024 bytes
 
 % sudo chrootx stop ch01
 
