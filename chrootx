@@ -131,7 +131,8 @@ sub help {
       sudo chrootx new sys02 ubuntu
       sudo chrootx -i new sys03 clone:sys02
       sudo chrootx -i --size=60G new sys04 clone:sys02
-      sudo chrootx clone sys02 sys06
+      sudo chrootx clone sys02 sys05
+      sudo chrootx start sys05 /etc/init.d/lighttpd start
       
 ";   
    exit 0;

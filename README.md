@@ -84,7 +84,6 @@ chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
       sudo chrootx -i new sys03 clone:sys02
       sudo chrootx -i --size=60G new sys04 clone:sys02
       sudo chrootx clone sys03 sys05
-      sudo chrootx sys05 /etc/init.d/lighttpd start
 ```
 
 ##JChroot
@@ -107,4 +106,6 @@ and see if it works, in case it fails, remove `jchroot` again:
 ```
 and keep using `chrootx` bare.
 
+<br><br><br><center>
 -- End of README.md --
+</center>
