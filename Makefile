@@ -13,7 +13,6 @@ jchroot::
 install::
 	cp -f chrootx /usr/sbin/
 	cp -f chrootx.conf /etc/
-	cp -f jchroot/jchroot /usr/sbin/
 	mkdir -p /var/lib/chrootx
 	cp -rp templates /var/lib/chrootx
 	cp -f fstab.chrootx /var/lib/chrootx/fstab
