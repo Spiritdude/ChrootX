@@ -94,7 +94,7 @@ ChrootX supports [jchroot](https://github.com/vincentbernat/jchroot), which isol
 Check if your vserver permits to run it:
 ```
 % cd ChrootX
-% make jchroot
+% sudo make jchroot
 ```
 create a chroot environment:
 ```
