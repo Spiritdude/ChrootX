@@ -81,7 +81,7 @@ chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
 
 ##JChroot
 
-ChrootX supports `<a href="https://github.com/vincentbernat/jchroot">jchroot</a>`, which isolates the processes further, and allows to set hostname with the chroot. 
+ChrootX supports [https://github.com/vincentbernat/jchroot jchroot], which isolates the processes further, and allows to set hostname with the chroot. 
 Check if your vserver permits to run it:
 ```
 % cd ChrootX
