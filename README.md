@@ -46,6 +46,13 @@ Platforms: <b>Linux</b> (Debian / Ubuntu 14.04 or later)
 
 % sudo chrootx stop ch01
 
+% sudo chrootx new ch03 ubuntu
+
+% sudo chrootx start ch03 /bin/bash
+(configure system, and install apache2)
+
+% sudo chrootx start ch03 /etc/init.d/apache2 start
+
 % sudo chrootx help
 chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
    options:
