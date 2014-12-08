@@ -10,10 +10,11 @@ my $VERSION = '0.0.7';
 # License: GPLv3
 #
 # Description:
-#   Chrootx is for handling: create, delete, start and stop chrooted systems, identified with an ID
-#      optionally jchroot is used (if it exists) to improve isolation further.
+#   Chrootx is for handling: create, clone, delete, start and stop chrooted systems, identified with 
+#      an ID optionally jchroot is used (if it exists) to improve isolation further.
 #   It's mainly targeted to simplify creating pseudo virtualization, e.g. if you run within a VM already,
-#      like a virtual server, chrootx allows to further create sub systems without any hassle.
+#      like a virtual server where lxc or qemu won't run due lack of functionality, chrootx allows to 
+#      further create sub systems without any hassle, 
 #
 # History:
 # 2014/12/08: 0.0.6: support of file-based filesystem using qemu-img
@@ -128,9 +129,9 @@ sub help {
    examples:
       sudo chrootx new sys01 
       sudo chrootx new sys02 ubuntu
-      sudo chrootx -i new sys04 clone:sys02
-      sudo chrootx -i --size=60G new sys05 clone:sys03
-      sudo chroot clone sys03 sys06
+      sudo chrootx -i new sys03 clone:sys02
+      sudo chrootx -i --size=60G new sys04 clone:sys02
+      sudo chroot clone sys02 sys06
       
 ";   
    exit 0;
