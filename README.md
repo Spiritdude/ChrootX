@@ -68,7 +68,7 @@ chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
                                  type: 'cloop', 'cow', 'qcow', 'qcow2', 'raw', 'vdi', 'vmdk'
       --size=<size>           size of image (default: 4G)
                                  e.g. '200M', '2G' etc
-      --fs=<type>             filesystem in the image (default: ext4)
+      --fs=<type>             fs-type in the image (default: ext4)
       
    commands:
       create <id> [<type>]    aka 'new', 'install', (default type: 'minimal')

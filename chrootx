@@ -114,7 +114,7 @@ sub help {
                                  type: $ftypes
       --size=<size>           size of image (default: $conf->{size})
                                  e.g. '200M', '2G' etc
-      --fs=<type>             filesystem in the image (default: $conf->{fs})
+      --fs=<type>             fs-type in the image (default: $conf->{fs})
       
    commands:
       create <id> [<type>]    aka 'new', 'install', (default type: 'minimal')
