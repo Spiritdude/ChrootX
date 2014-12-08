@@ -28,7 +28,7 @@ All chroot environments are identified with an id:
 % sudo chrootx start ch01
 
 % sudo chrootx 
-   ch01 (minimal): running
+   ch01 (minimal): running: 1 process
       ch02 (bash): stopped
 
 % sudo chrootx -l
