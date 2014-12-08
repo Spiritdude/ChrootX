@@ -18,6 +18,7 @@ Platforms: Linux (Ubuntu 14.04 or later)
 ==Usage==
 <pre>
 % sudo chrootx create ch01
+
 % sudo chrootx create ch02 bash
 
 % sudo chrootx start ch01
@@ -29,15 +30,16 @@ Platforms: Linux (Ubuntu 14.04 or later)
 % sudo chroot -l
    ch01:
         status: running
-        type: minimal
-        ctime: 2014/11/30 18:23:51.000 (1day 21hrs 34mins 47secs ago)
-        size: 3,973,120
+     processes: 2
+          type: minimal
+         ctime: 2014/11/30 18:23:51.000 (1day 21hrs 34mins 47secs ago)
+          size: 3,973,120
         
    ch02:
         status: stopped
-        type: bash
-        ctime: 2014/11/30 18:24:58.000 (1day 21hrs 35mins 48secs ago)
-        size: 3,969,024
+          type: bash
+         ctime: 2014/11/30 18:24:58.000 (1day 21hrs 35mins 48secs ago)
+          size: 3,969,024
 
 % sudo chroot stop ch01
 

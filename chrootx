@@ -5,7 +5,7 @@
 #       http://github.com/Spiritdude/ChrootX/
 #
 my $APPNAME = 'chrootx';
-my $VERSION = '0.0.6';
+my $VERSION = '0.0.7';
 #
 # License: GPLv3
 #
@@ -199,20 +199,17 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    my($id) = sane(shift(@ARGV),'id');
 
    existRoot($id,{must=>1});
-
    if(statusRoot($id)eq'running') {
       foreach (@{$_pid->{$id}->{pid}}) {
          kill 'KILL', $_;
       }
-      
-      if($conf->{jchroot}) {
-         ;
-      } else {
-         umountRoot($id);
-      }
-
    } else {
       print "<$id> is not running\n";
+   }   
+   if($conf->{jchroot}) {
+      ;
+   } else {
+      umountRoot($id);
    }
    
 } elsif($cmd eq 'mv'||$cmd eq 'rename') {

@@ -1,17 +1,19 @@
 DATE=`date +%Y-%m-%d`
 NAME=ChrootX
-VERSION=0.0.6
+VERSION=0.0.7
 
 requirements::
-	apt-get install bash-static busybox-static debootstrap rpm yum yum-utils rinse qemu
-	git clone https://github.com/vincentbernat/jchroot; cd jchroot; make
+	apt-get install bash-static busybox-static debootstrap rinse qemu-utils
 	cpan JSON DateTime Time::HiRes
+
+jchroot::
+	git clone https://github.com/vincentbernat/jchroot; cd jchroot; make; cp -f jchroot /usr/sbin/
 
 install::
 	cp -f chrootx /usr/sbin/
 	cp -f chrootx.conf /etc/
 	cp -f jchroot/jchroot /usr/sbin/
-	mkdir -p /var/lib/chrootx/templates
+	mkdir -p /var/lib/chrootx
 	cp -rp templates /var/lib/chrootx
 	cp -f fstab.chrootx /var/lib/chrootx/fstab
 
