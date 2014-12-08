@@ -8,7 +8,7 @@ License: <b>GPLv3</b>
 
 Platforms: <b>Linux</b> (Debian / Ubuntu 14.04 or later)
 
-Supported chrooted distributions: <b>Debian, Ubuntu, Fedora, RedHat, CentOS, OpenSUSE, Busybox, Bash</b> (default)
+Chrooted Distributions: <b>Debian, Ubuntu, Fedora, RedHat, CentOS, OpenSUSE, Busybox, Bash</b> (default)
 
 ##Installation
 
