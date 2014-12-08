@@ -7,7 +7,8 @@ requirements::
 	cpan JSON DateTime Time::HiRes
 
 jchroot::
-	git clone https://github.com/vincentbernat/jchroot; cd jchroot; make; cp -f jchroot /usr/sbin/
+	git clone https://github.com/vincentbernat/jchroot
+	cd jchroot; make; cp -f jchroot /usr/sbin/
 
 install::
 	cp -f chrootx /usr/sbin/
@@ -26,4 +27,12 @@ edit::
 
 backup::
 	cd ..; tar cfvz ${NAME}-${VERSION}.tar.gz ${NAME}; scp ${NAME}-${VERSION}.tar.gz the-labs.com:Backup/; mv ${NAME}-${VERSION}.tar.gz ~/ownCloud/Backup/
+
+push::
+	git remote set-url origin git@github.com:Spiritdude/ChrootX.git
+	git push -u origin master
+
+pull::
+	git remote set-url origin git@github.com:Spiritdude/ChrootX.git
+	git pull -u origin master
 
