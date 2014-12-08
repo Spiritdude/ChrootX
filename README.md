@@ -1,4 +1,4 @@
-#CHROOTX
+#ChrootX
 
 Small toolbox to create, delete, start and stop chrooted environments, allowing lightweight virtualization within virtual servers again, where LXC or Qemu might fail to run.
 
@@ -6,7 +6,7 @@ Version: <b>0.0.7</b>
 
 License: <b>GPLv3</b>
 
-Platforms: Linux (Debian / Ubuntu 14.04 or later)
+Platforms: <b>Linux</b> (Debian / Ubuntu 14.04 or later)
 
 ##Installation
 
