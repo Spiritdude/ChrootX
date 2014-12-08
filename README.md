@@ -78,7 +78,7 @@ chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
       delete <id>             aka 'deinstall', 'remove', 'destroy'
       start <id> [<cmds>] ..  aka 'run'
       stop <id>               aka 'halt', 'kill', 'abort'
-      info <id>
+      info <id>               aka 'status'
       list                    default action, use -l to list details
 
    examples:
