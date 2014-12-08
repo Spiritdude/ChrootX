@@ -1,4 +1,4 @@
-=CHROOTX=
+#CHROOTX
 
 Small toolbox to create, delete, start and stop chrooted environments, allowing lightweight virtualization within virtual servers again, where LXC or Qemu might fail to run.
 
@@ -8,7 +8,7 @@ License: <b>GPLv3</b>
 
 Platforms: Linux (Debian / Ubuntu 14.04 or later)
 
-==Installation==
+##Installation
 
 ```
 % git clone http://github.com/Spiritdude/ChrootX
@@ -18,8 +18,8 @@ Platforms: Linux (Debian / Ubuntu 14.04 or later)
 % sudo make requirements install
 ```
 
-==Usage==
-<pre>
+##Usage
+```
 % sudo chrootx create ch01
 
 % sudo chrootx create ch02 bash
@@ -77,6 +77,6 @@ chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
       sudo chrootx -i new sys03 clone:sys02
       sudo chrootx -i --size=60G new sys04 clone:sys02
       sudo chroot clone sys03 sys05
-</pre>
+```
 
 -- End of README.md --
