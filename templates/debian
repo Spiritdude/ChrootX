@@ -2,16 +2,16 @@
 
 # == Debian
 # written by Rene K. Mueller <spiritdude@gmail.com>
-#    installs debian, release name as argument
+#    installs debian, release name as argument (no number)
 
 DIR=$1
 ID=`basename $1`
-NUM=$2
-DIST=sid
 
-if [ -n "${NUM}" ] 
+if [ -n "$2" ] 
 then
-   DIST=${NUM}
+   DIST=$2
+else
+   DIST=sid
 fi
 
 echo "\tfetching debian ${DIST}";
