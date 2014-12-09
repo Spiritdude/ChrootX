@@ -106,7 +106,7 @@ sub help {
    print "$APPNAME $VERSION usage: [<options>] <command> [<arguments>]
    options:
       -verbose or -v or -vv   increase verbosity
-      -conf <file>            consider configuration file
+      -conf <file>            consider configuration file (default: /etc/chrootx.conf)
       -version or --version   display version
       -l                      long output
       -i                      image-based root 
@@ -308,7 +308,7 @@ sub createRoot {
       if(-e "$conf->{root}/templates/$type") {
          if(1) {
             if(fork()==0) {
-               print "\tapply template $type\n";
+               print "\tapply template $type (@ARGV)\n";
                exec("$conf->{root}/templates/$type","$conf->{root}/roots/$id",@ARGV);
             } else {
                wait();

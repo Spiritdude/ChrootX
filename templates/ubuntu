@@ -1,15 +1,60 @@
 #!/bin/sh
 
-# == Ubuntu Trusty
+# == Ubuntu 12, 13, 14 & 15
 # written by Rene K. Mueller <spiritdude@gmail.com>
-#    installs ubuntu 'trusty'
+#    installs ubuntu, referenced by release number or name
+#
+# History:
+# 2014/12/09: 0.0.2: support additional argument to select release, by number or name
+# 2014/12/07: 0.0.1: base 'trusty' support
 
+DIR=$1
 ID=`basename $1`
-debootstrap trusty $1 http://archive.ubuntu.com/ubuntu 
+NUM=$2
+DIST=trusty
+
+if [ "${NUM}" = "15.04" ] 
+then
+   DIST=vivid
+elif [ "${NUM}" = "15" ] 
+then
+   DIST=vivid
+elif [ "${NUM}" = "14.10" ] 
+then
+   DIST=utopic
+elif [ "${NUM}" = "14.04" ] 
+then
+   DIST=trusty
+elif [ "${NUM}" = "14" ] 
+then
+   DIST=trusty
+elif [ "${NUM}" = "13.10" ]
+then
+   DIST=saucy
+elif [ "${NUM}" = "13.04" ]
+then
+   DIST=raring
+elif [ "${NUM}" = "13" ]
+then
+   DIST=raring
+elif [ "${NUM}" = "12.04" ]
+then
+   DIST=precise
+elif [ "${NUM}" = "12" ]
+then
+   DIST=precise
+elif [ -n "$2" ]
+then
+   DIST=$2
+fi
+
+echo "\tfetching ubuntu ${DIST}";
+
+debootstrap ${DIST} ${DIR} http://archive.ubuntu.com/ubuntu
 
 # -- set hostname
-mkdir -p $1/etc; echo "${ID}" > $1/etc/hostname
-#chroot $1 /bin/sh -c "/bin/hostname ${ID}"
+mkdir -p ${DIR}/etc; echo "${ID}" > ${DIR}/etc/hostname
+#chroot ${DIR} /bin/sh -c "/bin/hostname ${ID}"
 
-echo "rootfs / rootfs rw 0 0" > $1/etc/mtab
+echo "rootfs / rootfs rw 0 0" > ${DIR}/etc/mtab
 
