@@ -91,23 +91,16 @@ chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
 
 ##JChroot
 
-ChrootX supports [jchroot](https://github.com/vincentbernat/jchroot), which isolates the processes further, and allows to set hostname with the chroot. 
-
-Check if your vserver permits to run it:
+ChrootX supports [jchroot](https://github.com/vincentbernat/jchroot), which isolates the processes further, and allows to set hostname with the chroot - check if your vserver permits to run it:
 ```
 % cd ChrootX
 % sudo make jchroot
 ```
-create a chroot environment:
+which compiles and installs `jchroot` to /usr/sbin/
 ```
-% sudo chrootx new sys01
-% sudo chrootx start sys01
+% sudo chrootx -j start sys01
 ```
-and see if it works, in case it fails, remove `jchroot` again:
-```
-% sudo rm -f /usr/sbin/jchroot
-```
-and keep using `chrootx` bare.
+and see if it works. The `-j` switch enables `jchroot` if it exists.
 
 <br><br><br>
 --- End of README.md ---
