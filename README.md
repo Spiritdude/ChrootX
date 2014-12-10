@@ -97,9 +97,8 @@ chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
 </ul>
 
 ##Simple Examples
-I recommend following convention: enumerate all your chrooted environments, e.g. with 'sys' + number, and 
-use port range of 1000, e.g. `sys01` uses 1000-1999, `sys02` uses 2000-2999, like ssh 1022 or 2022, or httpd 1080 or 2080.
-
+I recommend following convention for single IP host: enumerate all your chrooted environments, e.g. with 'sys' + number, and 
+use port range of 1000, e.g. `sys01` uses 1000-1999 (ssh 1022, httpd 1080), `sys02` uses 2000-2999 (ssh 1022, httpd 2080) and so forth.
 
 ###Lighttpd
 ```
