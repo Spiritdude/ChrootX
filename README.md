@@ -121,7 +121,7 @@ sys01% apt-get install openssh-server
 sys01% vi /etc/ssh/sshd_config
 (assign new port, e.g. 1022)
 
-sys01% `which sshd -D` &
+sys01% `which sshd`
 (launches sshd server manually, as /etc/init.d/ssh start won't do it, as it thinks it runs already (on host))
 ```
 
