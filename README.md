@@ -105,24 +105,24 @@ use port range of 1000, e.g. `sys01` uses 1000-1999, `sys02` uses 2000-2999, lik
 ```
 % sudo chroot start sys01 /bin/bash
 
-sys01: % apt-get install lighttpd tcsh
+sys01% apt-get install lighttpd tcsh
 (install of lighttpd fails likely)
 
-sys01: % vi /etc/lighttpd/lighttpd.conf
+sys01% vi /etc/lighttpd/lighttpd.conf
 (change port number, e.g. to 1080)
 
-sys01: % apt-get --reinstall install lighttpd
+sys01% apt-get --reinstall install lighttpd
 (install succeeds)
 ```
 ###Sshd
 ```
-sys01: % apt-get install openssh-server
+sys01% apt-get install openssh-server
 (fails to start, as it thinks it runs already (on host))
 
-sys01: % vi /etc/ssh/sshd_config
+sys01% vi /etc/ssh/sshd_config
 (assign new port, e.g. 1022)
 
-sys01: % `which sshd -D` &
+sys01% `which sshd -D` &
 (launches sshd server manually, as /etc/init.d/ssh start won't do it, as it thinks it runs already (on host))
 ```
 
