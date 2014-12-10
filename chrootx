@@ -63,8 +63,8 @@ while($ARGV[0]=~/^-/) {
       conf(shift(@ARGV));
    }
    help() if(/^-help$/||/^-h/);
-   if(/^-(\w+)=(.*)$/||/^--(\w+)=(.*)$/) {
-      $conf->{$1} = $2;
+   if(/^--?(\w+)=(.*)$/||/^--(\w+)=(.*)$/) {
+      deepVar($conf,$1,$2), next;
 
    } elsif(/^-(\w+)/||/^--(\w+)/) {
       my $v = $1;
@@ -78,7 +78,6 @@ while($ARGV[0]=~/^-/) {
       }
       next;
    }
-   deepVar($conf,$1,$2), next if(/^--?([\.\w]+)=(.*)/);
 }
 
 my $cmd = shift(@ARGV);
@@ -108,13 +107,16 @@ sub help {
       -verbose or -v or -vv   increase verbosity
       -conf <file>            consider configuration file (default: /etc/chrootx.conf)
       -version or --version   display version
+      -f                      force action, e.g. overwrite (partial) existing chroot
       -l                      long output
-      -i                      image-based root 
+      -i                      image-based root, use 'new' or 'create' as command
       --format=<type>         image format (default: $conf->{format})
                                  type: $ftypes
       --size=<size>           size of image (default: $conf->{size})
                                  e.g. '200M', '2G' etc
       --fs=<type>             fs-type in the image (default: $conf->{fs})
+      '--comment=a text'      add a timestamped comment, use 'info' as command
+      -j                      consider /usr/sbin/jchroot if it exists (default: chroot)
       
    commands:
       create <id> [<type>]    aka 'new', 'install', (default type: 'minimal')
@@ -147,7 +149,7 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
 
    $type = shift(@ARGV) if($#ARGV>=0);
 
-   if(!existRoot($id)) {
+   if(!existRoot($id)||$conf->{f}) {
       createRoot($id,$type);
    } else {
       print "<$id> exists already\n";
@@ -184,7 +186,7 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    
    writeJSON("$conf->{root}/roots/$id/.info.json",$i);
    
-   if($conf->{jchroot}) {
+   if($conf->{j}&&$conf->{jchroot}) {
       foreach (@mnts) {
          my(@d) = split(/\s+/);
          mkrdir("$conf->{root}/roots/$id$d[1]") unless(-e "$conf->{root}/roots/$id$d[1]");
@@ -206,9 +208,9 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
          kill 'KILL', $_;
       }
    } else {
-      print "<$id> is not running\n";
+      print "<$id> is not running\n" unless($conf->{f});
    }   
-   if($conf->{jchroot}) {
+   if($conf->{j}&&$conf->{jchroot}) {
       ;
    } else {
       umountRoot($id);
@@ -253,6 +255,11 @@ if($cmd eq 'create'||$cmd eq 'new'||$cmd eq 'install') {
    my($id) = sane(shift(@ARGV),'id');
    $conf->{l}++;
    existRoot($id,{must=>1});
+   if($conf->{comment}) {
+      my $i = infoRoot($id);
+      push(@{$i->{comments}},{text=>$conf->{comment},time=>time()});
+      writeJSON("$conf->{root}/roots/$id/.info.json",$i);
+   }
    dispRoot($id);
 
 } elsif($cmd eq 'help') {
@@ -291,7 +298,7 @@ sub createRoot {
    my($id,$type) = @_;
    my $i;
 
-   unless(-e "$conf->{root}/roots/$id") {
+   if(!(-e "$conf->{root}/roots/$id")||$conf->{f}) {
       mkdir "$conf->{root}/roots/$id";
       $i->{ctime} = time();
       $i->{type} = $type if($type);
@@ -542,25 +549,33 @@ sub dispRoot {
    
    if($conf->{l}) {
       print "   $id:\n";
-      foreach (qw(status processes type ctime stime uptime size)) {
-         next if(!defined $i->{$_});
-         my $v = $i->{$_};
-         if(/uptime/||$conf->{types}->{$_}eq'time') {
-            $v = prettyTime($v);
-         } elsif(/time/||$conf->{types}->{$_}eq'date') {
-            $v = prettyDate($v)." (".prettyAgo($i->{$_}).")" 
-         } else {
-            $v = prettyNumber($v) if($v=~/^[1-9]\d*$/);
+      if($conf->{verbose}) {
+         print toJSON($i),"\n";
+      } else {
+         foreach (qw(status processes type ctime stime uptime size comments)) {
+            next if(!defined $i->{$_});
+            my $v = $i->{$_};
+            if(/uptime/||$conf->{types}->{$_}eq'time') {
+               $v = prettyTime($v);
+            } elsif(/time/||$conf->{types}->{$_}eq'date') {
+               $v = prettyDate($v)." (".prettyAgo($i->{$_}).")" 
+            } elsif(/comments/) {
+               $v = '';
+               foreach (@{$i->{$_}}) {
+                  $v .= "\n\t\t'$_->{text}' (".prettyAgo($_->{time}).")";
+               }
+            } else {
+               $v = prettyNumber($v) if($v=~/^[1-9]\d*$/);
+            }
+            if(1) {
+               print sprintf("%15s: $v",$_);
+            } else {
+               print "\t$_: $v";
+            }
+            print " ".$conf->{units}->{$_} if($conf->{units}->{$_});
+            print "\n";
          }
-         if(1) {
-            print sprintf("%15s: $v",$_);
-         } else {
-            print "\t$_: $v";
-         }
-         print " ".$conf->{units}->{$_} if($conf->{units}->{$_});
-         print "\n";
       }
-      print toJSON($i),"\n" if($conf->{verbose});
       print "\n";
       
    } else {
