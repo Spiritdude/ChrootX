@@ -89,6 +89,11 @@ chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
       sudo chrootx clone sys03 sys05
 ```
 
+##Limitations
+-no process isolation, root in chrooted enviroment affects host environment, chrooted sshd thinks it's running already etc.
+-don't run /sbin/init, as it won't able to distinct of chrooted system and host
+-hostname can't be set within the chrooted environment, it will change hostname of host 
+
 ##JChroot
 
 ChrootX supports [jchroot](https://github.com/vincentbernat/jchroot), which isolates the processes further, and allows to set hostname with the chroot - check if your vserver permits to run it:
