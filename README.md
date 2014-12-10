@@ -90,9 +90,9 @@ chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
 ```
 
 ##Limitations
--no process isolation, root in chrooted enviroment affects host environment, chrooted sshd thinks it's running already etc.
--don't run /sbin/init, as it won't able to distinct of chrooted system and host
--hostname can't be set within the chrooted environment, it will change hostname of host 
+*no process isolation, root in chrooted enviroment affects host environment, chrooted sshd thinks it's running already etc.
+*don't run /sbin/init, as it won't able to distinct of chrooted system and host
+*hostname can't be set within the chrooted environment, it will change hostname of host 
 
 ##JChroot
 
