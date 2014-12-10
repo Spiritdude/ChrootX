@@ -91,10 +91,41 @@ chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
 
 ##Limitations
 <ul>
-<li>no process isolation, root in chrooted enviroment affects host environment, chrooted sshd thinks it's running already etc.
+<li>no process isolation, root in chrooted enviroment affects host environment, e.g. chrooted sshd thinks it's running already etc.
 <li>don't run /sbin/init, as it won't able to distinct of chrooted system and host
 <li>hostname can't be set within the chrooted environment, it will change hostname of host 
 </ul>
+
+##Simple Examples
+I recommend following convention: enumerate all your chrooted environments, e.g. with 'sys' + number, and 
+use port range of 1000, e.g. `sys01` uses 1000-1999, `sys02` uses 2000-2999, like ssh 1022 or 2022, or httpd 1080 or 2080.
+
+
+###Lighttpd
+```
+% sudo chroot start sys01 /bin/bash
+
+bash: % apt-get install lighttpd tcsh
+(install of lighttpd fails likely)
+
+bash: % vi /etc/lighttpd/lighttpd.conf
+(change port number, e.g. to 1080)
+
+bash: % apt-get --reinstall install lighttpd
+(install succeeds)
+```
+###Sshd
+bash: % apt-get install openssh-server
+(fails to start, as it thinks it runs already (on host))
+
+bash: % vi /etc/ssh/sshd_config
+(assign new port, e.g. 1022)
+
+bash: % `which sshd -D` &
+(launches sshd server manually, as /etc/init.d/ssh start won't do it, as it thinks it runs already (on host))
+```
+
+As you see, chrooted environments are rather lame VM approaches, nowhere as nice as LXC or Qemu-KVM.
 
 ##JChroot
 
