@@ -102,7 +102,8 @@ which compiles and installs `jchroot` to /usr/sbin/
 ```
 and see if it works. The `-j` switch enables `jchroot` if it exists.
 
-<b>Note:</b> `jchroot` integration is highly experimental at this moment.
+<b>Note:</b> all started chrooted environments must be stopped again before you can restart with `-j` switch.
+
 
 <br><br><br>
 --- End of README.md ---

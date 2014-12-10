@@ -440,8 +440,12 @@ sub statusRoot {
          # print "\n";
       }
    }
-   return $_pid->{$id}->{pid}?"running":"stopped";
-   return isMounted("$conf->{root}/roots/$id/dev/pts")?"running":"stopped";
+   if($conf->{j}&&$conf->{jchroot}) {
+      return $_pid->{$id}->{pid}?"running":"stopped";
+   } else {
+      $_pid->{$id}->{pids} = 0 unless($_pid->{$id}->{pids});
+      return isMounted("$conf->{root}/roots/$id/dev/pts")?"running":"stopped";
+   }
 }
 
 sub isMounted {
@@ -579,7 +583,7 @@ sub dispRoot {
       print "\n";
       
    } else {
-      my $p; $p = ": ".$i->{processes}." process".($i->{processes}>1?"es":"") if($i->{status}eq'running');
+      my $p; $p = ": ".$i->{processes}." process".($i->{processes}!=1?"es":"") if($i->{status}eq'running');
       print sprintf("%20s: $i->{status}$p\n","$id ($i->{type})");
    }
    return $i;
