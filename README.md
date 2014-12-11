@@ -124,7 +124,8 @@ sys01% vi /etc/ssh/sshd_config
 (assign new port, e.g. 1022)
 
 sys01% `which sshd`
-(launches sshd server manually, as /etc/init.d/ssh start won't do it, as it thinks it runs already (on host))
+(launches sshd server manually, as /etc/init.d/ssh start won't do it, 
+ as it determines it runs already (on host))
 ```
 
 As you see, chrooted environments are rather lame VM approaches, nowhere as nice as LXC or Qemu-KVM.
