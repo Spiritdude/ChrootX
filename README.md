@@ -57,7 +57,7 @@ All chroot environments are identified with an id:
 % sudo chrootx start ch03 /etc/init.d/apache2 start
 
 % sudo chrootx help
-chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
+chrootx 0.0.7 usage: [<options>] <command> [<arguments>]
    options:
       -verbose or -v or -vv   increase verbosity
       -conf <file>            consider configuration file
@@ -69,6 +69,8 @@ chrootx 0.0.6 usage: [<options>] <command> [<arguments>]
       --size=<size>           size of image (default: 4G)
                                  e.g. '200M', '2G' etc
       --fs=<type>             fs-type in the image (default: ext4)
+      '--comment=a text'      add a timestamped comment, use 'info' as command
+      -j                      consider /usr/sbin/jchroot if it exists (default: chroot)
       
    commands:
       create <id> [<type>]    aka 'new', 'install', (default type: 'minimal')
