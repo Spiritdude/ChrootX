@@ -10,7 +10,7 @@ Platforms: <b>Linux</b> (Debian / Ubuntu 14.04 or later)
 
 Chrooted Distributions: <b>Debian, Ubuntu, Fedora, RedHat, CentOS, OpenSUSE, Busybox, Bash</b> (default)
 
-# #Installation
+## Installation
 
 ```
 % git clone http://github.com/Spiritdude/ChrootX
